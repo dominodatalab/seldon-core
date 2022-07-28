@@ -21,7 +21,7 @@ import (
 func TestValidProtocolTransportServerType(t *testing.T) {
 	g := NewGomegaWithT(t)
 	spec := &SeldonDeploymentSpec{
-		ServerType: ServerRPC,
+		ServerType: ServerTypeRPC,
 		Protocol:   ProtocolTensorflow,
 		Transport:  TransportGrpc,
 		Predictors: []PredictorSpec{
@@ -54,7 +54,7 @@ func TestValidProtocolTransportServerType(t *testing.T) {
 func TestNoGraphType(t *testing.T) {
 	g := NewGomegaWithT(t)
 	spec := &SeldonDeploymentSpec{
-		ServerType: ServerRPC,
+		ServerType: ServerTypeRPC,
 		Protocol:   ProtocolTensorflow,
 		Transport:  TransportGrpc,
 		Predictors: []PredictorSpec{
