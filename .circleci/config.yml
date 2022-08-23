@@ -1,9 +1,23 @@
 version: 2.1
 
+parameters:
+  kustomize-version:
+    type: string
+    default: v4.5.7
+
 jobs:
   build:
     docker:
      - image: golang:1.18-bullseye
     steps:
       - checkout
+      - run:
+          name: "Install kustomize"
+          command: |
+            URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
+            curl -L $URL | tar zx
+
+            [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
+            $SUDO chmod +x ./kustomize
+            $SUDO mv ./kustomize /usr/local/bin
       - run: ./domino-build.sh
