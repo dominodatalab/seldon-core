@@ -5,4 +5,5 @@ jobs:
     docker:
      - image: golang:1.18-bullseye
     steps:
-        - run: echo "Sample CircleCI job."
+      - checkout
+      - run: ./domino-build.sh
