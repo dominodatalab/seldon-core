@@ -9,7 +9,7 @@ parameters:
     default: v4.5.7
 
 jobs:
-  build:
+  build-and-push:
     docker:
      - image: cimg/base:2022.08
     resource_class: medium
@@ -32,14 +32,14 @@ jobs:
           name: "Docker login"
           command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
       - run:
-          name: "Seldon-core Domino Build Script"
+          name: "Seldon-core Domino Build & Push Script"
           command: ./domino-build.sh
 
 workflows:
   version: 2
   main:
     jobs:
-      - build:
+      - build-and-push:
           context:
             - org-global
           filters:
