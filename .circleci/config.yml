@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  docker: circleci/docker@2.1.3
+
 parameters:
   kustomize-version:
     type: string
@@ -20,4 +23,5 @@ jobs:
             [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
             $SUDO chmod +x ./kustomize
             $SUDO mv ./kustomize /usr/local/bin
+      - docker/install-docker
       - run: ./domino-build.sh
