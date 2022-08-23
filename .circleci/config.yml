@@ -34,3 +34,20 @@ jobs:
       - run:
           name: "Seldon-core Domino Build Script"
           command: ./domino-build.sh
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build:
+          context:
+            - org-global
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
+#      - test:
+#          requires:
+#            - build
+#          filters:
+#            tags:
+#              only: /v\d+(\.\d+)*(-.*)*/
