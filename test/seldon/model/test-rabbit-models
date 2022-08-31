@@ -3,8 +3,10 @@
 set -o nounset -o errexit -o pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-
 MODELS_DIR=$SCRIPT_DIR/../../models
+COMMON_DIR=$SCRIPT_DIR/../common
+
+source "${COMMON_DIR}/with_backoff.sh"
 
 COMPUTE_NAMESPACE=seldon-regression-test
 
@@ -21,14 +23,15 @@ kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
     -H "Accept: application/json" \
     -d '{"properties":{"content_type":"application/json"},"routing_key":"iris-model-rabbitmq-input","payload":"{\"data\": {\"ndarray\": [[1,2,3,4]] }}","payload_encoding":"string"}'
 
-sleep 10 # I wish there was a better way to do this
-
-IRIS_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-    curl -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
-    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-    -H "Content-type: application/json" \
-    -H "Accept: application/json" \
-    -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}' | jq -r '.[0].payload')
+function retrieveIrisResult {
+  IRIS_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
+      curl -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
+      --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+      -H "Content-type: application/json" \
+      -H "Accept: application/json" \
+      -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}' | jq -e -r '.[0].payload')
+}
+with_backoff retrieveIrisResult
 
 if [ "${EXPECTED_IRIS_RESULT_PAYLOAD}" != "${IRIS_RESULT_PAYLOAD}" ]; then
   echo "UNEXPECTED IRIS MODEL RESULT: ${IRIS_RESULT_PAYLOAD}"
@@ -44,16 +47,16 @@ kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
     -H "Accept: application/json" \
     -d "${CIFAR10_REQUEST_PAYLOAD}"
 
-sleep 10 # I wish there was a better way to do this
-
-CIFAR10_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-    curl -X POST "http://localhost:15672/api/queues/%2F/cifar10-rest-output/get" \
-    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-    -H "Content-type: application/json" \
-    -H "Accept: application/json" \
-    -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}' | \
-    jq -r '.[0].payload' | jq -r '.predictions[0][]' | xargs -I{} printf "%.2e," "{}"
-)
+function retrieveCifar10Result {
+  CIFAR10_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
+      curl -X POST "http://localhost:15672/api/queues/%2F/cifar10-rest-output/get" \
+      --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+      -H "Content-type: application/json" \
+      -H "Accept: application/json" \
+      -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}' | \
+      jq -e -r '.[0].payload' | jq -r '.predictions[0][]' | xargs -I{} printf "%.2e," "{}")
+}
+with_backoff retrieveCifar10Result
 
 if [ "${EXPECTED_CIFAR10_RESULT_PAYLOAD}" != "${CIFAR10_RESULT_PAYLOAD}" ]; then
   echo "UNEXPECTED CIFAR10 MODEL RESULT: ${CIFAR10_RESULT_PAYLOAD}"
