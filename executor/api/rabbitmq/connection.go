@@ -20,7 +20,7 @@ const (
 	queueExclusive  = false
 	queueNoWait     = false
 
-	amqpExchange = ""
+	amqpExchange = "501.1.router"
 )
 
 var (
