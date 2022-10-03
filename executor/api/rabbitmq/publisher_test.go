@@ -22,10 +22,6 @@ func TestPublisher(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockChan := &mockChannel{}
 
-		//mockChan.On("QueueDeclare", queueName, true, false, false, false,
-		//	queueArgs).Return(amqp.Queue{Name: queueName},
-		//	nil)
-
 		mockChan.On("Publish", "", queueName, true, false, amqp.Publishing{
 			Headers:     make(map[string]interface{}),
 			ContentType: "application/json",
@@ -69,10 +65,6 @@ func TestPublisher(t *testing.T) {
 
 	t.Run("connection_closed", func(t *testing.T) {
 		f, reset := setupConnect(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
-			//channel.On("QueueDeclare", queueName, true, false, false, false,
-			//	queueArgs).Return(amqp.Queue{Name: queueName},
-			//	nil)
-
 			channel.On("Publish", "", queueName, true, false, amqp.Publishing{
 				Headers:     make(map[string]interface{}),
 				ContentType: "application/json",

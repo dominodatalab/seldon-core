@@ -13,6 +13,7 @@ import (
 	"github.com/seldonio/seldon-core/executor/api/test"
 	v1 "github.com/seldonio/seldon-core/operator/apis/machinelearning.seldon.io/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -86,6 +87,16 @@ func TestRabbitMqServer(t *testing.T) {
 	testPuid := guuid.New().String()
 	testHeaders := map[string]interface{}{payload.SeldonPUIDHeader: testPuid}
 
+	invalidErrorJsonResponse := fmt.Sprintf(
+		`{"status":{"info":"Prediction Failed","reason":"unknown payload type 'bogus'","status":"FAILURE"},"meta":{"puid":"%v"}}`,
+		testPuid,
+	)
+	invalidErrorPublishing := amqp.Publishing{
+		ContentType: "application/json",
+		Body:        []byte(invalidErrorJsonResponse),
+		Headers:     testHeaders,
+	}
+
 	t.Run("create server", func(t *testing.T) {
 		server, err := CreateRabbitMQServer(RabbitMQServerOptions{
 			DeploymentName:  deploymentName,
@@ -116,6 +127,85 @@ func TestRabbitMqServer(t *testing.T) {
 		assert.NotNil(t, server.Log)
 		assert.Equal(t, protocol, server.Protocol)
 		assert.Equal(t, fullHealthCheck, server.FullHealthCheck)
+	})
+
+	/*
+	 * This makes sure the Serve() and predictAndPublishResponse() code runs and makes the proper calls
+	 * by hacking a bunch of mocks.
+	 * It is not doing anything to validate the messages are properly processed.  That's challenging in a
+	 * unit test since the code connects to RabbitMQ.
+	 */
+	t.Run("serve", func(t *testing.T) {
+		mockRmqConn := &mockConnection{}
+		mockRmqChan := &mockChannel{}
+		mockConn := &connection{
+			conn:    mockRmqConn,
+			channel: mockRmqChan,
+		}
+
+		testDelivery := amqp.Delivery{
+			Acknowledger: mockRmqChan,
+			ContentType:  rest.ContentTypeJSON,
+			Body:         []byte(`{ "data": { "ndarray": [[1,2,3,4]] } }`),
+			Headers:      testHeaders,
+		}
+
+		mockRmqChan.On("QueueDeclare", outputQueue, queueDurable, queueAutoDelete, queueExclusive,
+			queueNoWait, queueArgs).Return(amqp.Queue{}, nil)
+
+		mockDeliveries := make(chan amqp.Delivery, 1)
+		mockDeliveries <- testDelivery
+		close(mockDeliveries)
+
+		mockRmqChan.On("Consume", inputQueue, mock.Anything, false, false, false, false,
+			amqp.Table{}).Return(mockDeliveries, nil)
+		mockRmqChan.On("Publish", "", outputQueue, publishMandatory, publishImmediate,
+			mock.MatchedBy(func(p amqp.Publishing) bool { return true })).Return(nil)
+
+		err := testServer.serve(mockConn)
+
+		assert.NoError(t, err)
+
+		mockRmqChan.AssertExpectations(t)
+	})
+
+	/*
+	 * This makes sure the Serve(), predictAndPublishResponse(), and createAndPublishErrorResponse() code runs and
+	 * makes the proper calls and returns an appropriate error message by hacking a bunch of mocks.
+	 */
+	t.Run("serveError", func(t *testing.T) {
+		mockRmqConn := &mockConnection{}
+		mockRmqChan := &mockChannel{}
+		mockConn := &connection{
+			conn:    mockRmqConn,
+			channel: mockRmqChan,
+		}
+
+		invalidDelivery := amqp.Delivery{
+			Acknowledger: mockRmqChan,
+			ContentType:  "bogus",
+			Body:         []byte(`bogus`),
+			Headers:      testHeaders,
+			Redelivered:  true,
+		}
+
+		mockRmqChan.On("QueueDeclare", outputQueue, queueDurable, queueAutoDelete, queueExclusive,
+			queueNoWait, queueArgs).Return(amqp.Queue{}, nil)
+
+		mockDeliveries := make(chan amqp.Delivery, 1)
+		mockDeliveries <- invalidDelivery
+		close(mockDeliveries)
+
+		mockRmqChan.On("Consume", inputQueue, mock.Anything, false, false, false, false,
+			amqp.Table{}).Return(mockDeliveries, nil)
+		mockRmqChan.On("Publish", "", outputQueue, publishMandatory, publishImmediate,
+			invalidErrorPublishing).Return(nil)
+
+		err := testServer.serve(mockConn)
+
+		assert.NoError(t, err)
+
+		mockRmqChan.AssertExpectations(t)
 	})
 
 	t.Run("createAndPublishErrorResponse", func(t *testing.T) {
