@@ -22,11 +22,16 @@ func TestPublisher(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockChan := &mockChannel{}
 
-		mockChan.On("Publish", "", queueName, true, false, amqp.Publishing{
-			Headers:     make(map[string]interface{}),
-			ContentType: "application/json",
-			Body:        []byte(`"hello"`),
-		}).Return(nil)
+		msg := amqp.Publishing{
+			Headers:      make(map[string]interface{}),
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         []byte(`"hello"`),
+		}
+		println("### publisher-test: DeliveryMode set to ", msg.DeliveryMode)
+
+		mockChan.On("Publish", "", queueName, true, false, msg).Return(nil)
+		println("*** publisher-test: DeliveryMode set to ", msg.DeliveryMode)
 
 		pub := &publisher{
 			connection: connection{
