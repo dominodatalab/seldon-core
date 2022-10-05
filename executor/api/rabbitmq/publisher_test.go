@@ -28,10 +28,7 @@ func TestPublisher(t *testing.T) {
 			DeliveryMode: amqp.Persistent,
 			Body:         []byte(`"hello"`),
 		}
-		println("### publisher-test: DeliveryMode set to ", msg.DeliveryMode)
-
 		mockChan.On("Publish", "", queueName, true, false, msg).Return(nil)
-		println("*** publisher-test: DeliveryMode set to ", msg.DeliveryMode)
 
 		pub := &publisher{
 			connection: connection{
