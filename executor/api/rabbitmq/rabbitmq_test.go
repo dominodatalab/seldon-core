@@ -73,6 +73,9 @@ func (m *mockChannel) Nack(tag uint64, multiple bool, requeue bool) error {
 func (m *mockChannel) Reject(tag uint64, requeue bool) error {
 	return nil
 }
+func (m *mockChannel) Qos(prefetchCount int, prefetchSize int, global bool) error {
+	return nil
+}
 
 type TestPayload struct {
 	Msg string
