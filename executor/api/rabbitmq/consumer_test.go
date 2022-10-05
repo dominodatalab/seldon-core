@@ -74,6 +74,8 @@ func TestConsume(t *testing.T) {
 
 		err := cons.Consume(payloadHandler, errorHandler)
 
+		mockChan.On("Qos", 1, 0, true).Return(nil)
+
 		assert.NoError(t, err)
 		mockChan.AssertExpectations(t)
 	})
