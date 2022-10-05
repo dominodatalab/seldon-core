@@ -50,9 +50,10 @@ func TestPublisher(t *testing.T) {
 		mockChan := &mockChannel{}
 
 		mockChan.On("Publish", "", queueName, true, false, amqp.Publishing{
-			Headers:     make(map[string]interface{}),
-			ContentType: "application/json",
-			Body:        []byte(`"hello"`),
+			Headers:      make(map[string]interface{}),
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         []byte(`"hello"`),
 		}).Return(errors.New("test error"))
 
 		pub := &publisher{
@@ -71,9 +72,10 @@ func TestPublisher(t *testing.T) {
 	t.Run("connection_closed", func(t *testing.T) {
 		f, reset := setupConnect(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
 			channel.On("Publish", "", queueName, true, false, amqp.Publishing{
-				Headers:     make(map[string]interface{}),
-				ContentType: "application/json",
-				Body:        []byte(`"hello"`),
+				Headers:      make(map[string]interface{}),
+				ContentType:  "application/json",
+				DeliveryMode: amqp.Persistent,
+				Body:         []byte(`"hello"`),
 			}).Return(nil)
 
 			conn.On("Channel").Return(channel, nil)
@@ -103,9 +105,10 @@ func TestPublisher(t *testing.T) {
 		f, reset := setupConnect(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
 
 			channel.On("Publish", "", queueName, true, false, amqp.Publishing{
-				Headers:     make(map[string]interface{}),
-				ContentType: "application/json",
-				Body:        []byte(`"hello"`),
+				Headers:      make(map[string]interface{}),
+				ContentType:  "application/json",
+				DeliveryMode: amqp.Persistent,
+				Body:         []byte(`"hello"`),
 			}).Return(nil)
 
 			conn.On("Channel").Return(channel, nil)
