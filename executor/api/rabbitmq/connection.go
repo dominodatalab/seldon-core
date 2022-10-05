@@ -76,12 +76,7 @@ func (c *connection) Close() error {
 }
 
 // implements retry logic with delays for establishing AMQP connections.
-// prefetchCnt is variadic since Go does not support function argument default value
-func (c *connection) connect(prefetchCnt ...int) error {
-	pfc := 1
-	if len(prefetchCnt) > 0 {
-		pfc = prefetchCnt[0]
-	}
+func (c *connection) connect() error {
 
 	ticker := time.NewTicker(connectionRetryDelay)
 	defer ticker.Stop()
@@ -114,7 +109,7 @@ func (c *connection) connect(prefetchCnt ...int) error {
 			return fmt.Errorf("error '%w' creating rabbitmq channel to %q", err, c.uri)
 		}
 		c.channel.Qos(
-			pfc,
+			1,
 			0,
 			true,
 		)

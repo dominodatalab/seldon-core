@@ -33,10 +33,6 @@ func TestConsume(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockChan := &mockChannel{}
 
-		mockChan.On("QueueDeclare", queueName, true, false, false, false,
-			queueArgs).Return(amqp.Queue{Name: queueName},
-			nil)
-
 		mockDeliveries := make(chan amqp.Delivery, 1) // buffer 1 so that we send returns before starting consumer
 		mockDeliveries <- createTestDelivery(mockChan, []byte(testMessageStr), rest.ContentTypeJSON)
 		close(mockDeliveries)
@@ -79,14 +75,11 @@ func TestConsume(t *testing.T) {
 		err := cons.Consume(payloadHandler, errorHandler)
 
 		assert.NoError(t, err)
+		mockChan.AssertExpectations(t)
 	})
 
 	t.Run("encoded seldon msg", func(t *testing.T) {
 		mockChan := &mockChannel{}
-
-		mockChan.On("QueueDeclare", queueName, true, false, false, false,
-			queueArgs).Return(amqp.Queue{Name: queueName},
-			nil)
 
 		mockDeliveries := make(chan amqp.Delivery, 1) // buffer 1 so that we send returns before starting consumer
 		mockDeliveries <- createTestDelivery(mockChan, seldonMessageEnc, payload.APPLICATION_TYPE_PROTOBUF)
@@ -128,6 +121,7 @@ func TestConsume(t *testing.T) {
 		err := cons.Consume(payloadHandler, errorHandler)
 
 		assert.NoError(t, err)
+		mockChan.AssertExpectations(t)
 	})
 
 }
