@@ -40,6 +40,7 @@ func TestConsume(t *testing.T) {
 		mockChan.On("Consume", queueName, consumerTag, false, false, false, false,
 			amqp.Table{}).Return(mockDeliveries,
 			nil)
+		mockChan.On("Ack", uint64(0), false).Return(nil)
 
 		cons := &consumer{
 			connection: connection{
@@ -88,6 +89,7 @@ func TestConsume(t *testing.T) {
 		mockChan.On("Consume", queueName, consumerTag, false, false, false, false,
 			amqp.Table{}).Return(mockDeliveries,
 			nil)
+		mockChan.On("Ack", uint64(0), false).Return(nil)
 
 		cons := &consumer{
 			connection: connection{
