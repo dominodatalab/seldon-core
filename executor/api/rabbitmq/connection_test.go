@@ -49,6 +49,7 @@ func setupConnect(fn func(adapter *mockDialerAdapter, conn *mockConnection, chan
 		defaultDialerAdapter = origAdapter
 		connectionRetryDelay = origRetryDelay
 	}
+
 	return fixture, reset
 }
 
@@ -70,6 +71,9 @@ func TestNewConnection(t *testing.T) {
 
 		f.adapter.AssertExpectations(t)
 		f.connection.AssertExpectations(t)
+
+		err2 := actual.channel.Qos(1, 0, true)
+		assert.NoError(t, err2, "Qos() failed")
 	})
 
 	t.Run("reconnect", func(t *testing.T) {
