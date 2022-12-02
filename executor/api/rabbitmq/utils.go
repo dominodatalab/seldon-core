@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"fmt"
+	"github.com/golang/protobuf/jsonpb"
 	proto2 "github.com/golang/protobuf/proto"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seldonio/seldon-core/executor/api/grpc/seldon/proto"
@@ -56,4 +57,27 @@ func DeliveryToPayload(delivery amqp.Delivery) (*SeldonPayloadWithHeaders, error
 	}
 
 	return pl, err
+}
+
+func UpdatePayloadWithPuid(oldPayload payload.SeldonPayload, seldonPuid string) (payload.SeldonPayload, error) {
+	body := &proto.SeldonMessage{}
+	err := jsonpb.UnmarshalString(string(oldPayload.GetPayload().([]byte)), body)
+
+	if err != nil {
+		return nil, err
+	}
+	if body.Meta == nil {
+		body.Meta = &proto.Meta{Puid: seldonPuid}
+	}
+
+	msg, err2 := new(jsonpb.Marshaler).MarshalToString(body)
+	if err2 != nil {
+		return nil, err2
+	}
+
+	updatedPayload := &payload.BytesPayload{
+		Msg:             []byte(msg),
+		ContentType:     oldPayload.GetContentType(),
+		ContentEncoding: oldPayload.GetContentEncoding()}
+	return updatedPayload, nil
 }

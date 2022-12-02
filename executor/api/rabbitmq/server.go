@@ -34,6 +34,7 @@ const (
 	ENV_RABBITMQ_INPUT_QUEUE  = "RABBITMQ_INPUT_QUEUE"
 	ENV_RABBITMQ_OUTPUT_QUEUE = "RABBITMQ_OUTPUT_QUEUE"
 	ENV_RABBITMQ_FULL_GRAPH   = "RABBITMQ_FULL_GRAPH"
+	openapiFilePath           = "../rest/openapi/seldon.json"
 )
 
 type SeldonRabbitMQServer struct {
@@ -186,15 +187,22 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	seldonPredictorProcess := pred.NewPredictorProcess(
 		ctx, rs.Client, rs.Log.WithName("RabbitMqClient"), &rs.ServerUrl, rs.Namespace, reqPayload.Headers, "")
 
+	unhandledErrorString := "unhandled error from predictor process"
 	resPayload, err := seldonPredictorProcess.Predict(&rs.Predictor.Graph, reqPayload)
 	if err != nil && resPayload == nil {
 		// normal errors from the predict process contain a status failed payload
 		// this is handling an unexpected case, so failing entirely, at least for now
-		rs.Log.Error(err, "unhandled error from predictor process")
+		rs.Log.Error(err, unhandledErrorString)
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
 
-	return publishPayload(publisher, resPayload, seldonPuid)
+	updatedPayload, err := UpdatePayloadWithPuid(resPayload, seldonPuid)
+	if err != nil {
+		rs.Log.Error(err, unhandledErrorString)
+		return fmt.Errorf("unhandled error %w from predictor process", err)
+	}
+
+	return publishPayload(publisher, updatedPayload, seldonPuid)
 }
 
 func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs ConsumerError, publisher *publisher) error {
