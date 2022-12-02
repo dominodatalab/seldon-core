@@ -34,7 +34,6 @@ const (
 	ENV_RABBITMQ_INPUT_QUEUE  = "RABBITMQ_INPUT_QUEUE"
 	ENV_RABBITMQ_OUTPUT_QUEUE = "RABBITMQ_OUTPUT_QUEUE"
 	ENV_RABBITMQ_FULL_GRAPH   = "RABBITMQ_FULL_GRAPH"
-	openapiFilePath           = "../rest/openapi/seldon.json"
 )
 
 type SeldonRabbitMQServer struct {
