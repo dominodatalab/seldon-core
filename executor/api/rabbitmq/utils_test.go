@@ -18,7 +18,7 @@ func TestStringMapTableFunctions(t *testing.T) {
 		"key2": 45,
 	}
 	derivedStringMap1 := map[string][]string{
-		"key1": {"value1"}p,
+		"key1": {"value1"},
 		"key2": {"45"},
 	}
 	stringMap1 := map[string][]string{
