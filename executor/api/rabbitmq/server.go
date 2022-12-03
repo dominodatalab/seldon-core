@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"os"
+	"time"
+
 	"github.com/golang/protobuf/jsonpb"
 	guuid "github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seldonio/seldon-core/executor/api/grpc/seldon/proto"
-	"net/url"
-	"os"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/seldonio/seldon-core/executor/api"
@@ -192,6 +193,33 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		// this is handling an unexpected case, so failing entirely, at least for now
 		rs.Log.Error(err, "unhandled error from predictor process")
 		return fmt.Errorf("unhandled error %w from predictor process", err)
+	}
+	arrBytes, e := resPayload.GetBytes()
+	rs.Log.Info("KARTIK Test")
+	if e == nil {
+		if len(arrBytes) > 1 {
+			message := &proto.SeldonMessage{
+				Status: &proto.Status{
+					Code:   -1,
+					Info:   "Payload is great than 10kb",
+					Reason: "payload is large",
+					Status: proto.Status_FAILURE,
+				},
+				Meta: &proto.Meta{
+					Puid: seldonPuid,
+				},
+			}
+			jsonStr, err := new(jsonpb.Marshaler).MarshalToString(message)
+			if err != nil {
+				rs.Log.Error(err, "error marshaling seldon message")
+				return fmt.Errorf("error '%w' marshaling seldon message", err)
+			}
+			resPayload = &payload.BytesPayload{
+				Msg:         []byte(jsonStr),
+				ContentType: rest.ContentTypeJSON,
+			}
+			//resPayload = &payload.ProtoPayload{Msg: message}
+		}
 	}
 
 	return publishPayload(publisher, resPayload, seldonPuid)
