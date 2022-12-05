@@ -173,9 +173,6 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	}
 
 	seldonPuid := assignAndReturnPUID(reqPayload, nil)
-	rs.Log.Info("Seldon PUID", "seldon puid", seldonPuid)
-	b, err := reqPayload.GetBytes()
-	rs.Log.Info("Seldon message ", "reqPayload", string(b[:]))
 
 	ctx := context.WithValue(context.Background(), payload.SeldonPUIDHeader, seldonPuid)
 
@@ -246,7 +243,7 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 			Msg:         []byte(jsonStr),
 			ContentType: rest.ContentTypeJSON,
 		}
-		
+
 		break
 	}
 

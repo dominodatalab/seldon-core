@@ -60,14 +60,46 @@ func DeliveryToPayload(delivery amqp.Delivery) (*SeldonPayloadWithHeaders, error
 }
 
 func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.SeldonPayload) (payload.SeldonPayload, error) {
-	requestBody := &proto.SeldonMessage{}
-	err := jsonpb.UnmarshalString(string(reqPayload.GetPayload().([]byte)), requestBody)
-	if err != nil {
-		return nil, err
-	}
-	if requestBody.Meta == nil {
-		return oldPayload, nil
-	} else {
+
+	var msgBytes []byte
+	switch oldPayload.GetContentType() {
+	case payload.APPLICATION_TYPE_PROTOBUF:
+		requestBody := &proto.SeldonMessage{}
+		err := proto2.Unmarshal(reqPayload.GetPayload().([]byte), requestBody)
+		if err != nil {
+			return nil, err
+		}
+
+		if requestBody.Meta == nil {
+			return oldPayload, nil
+		}
+
+		body := &proto.SeldonMessage{}
+		err = proto2.Unmarshal(oldPayload.GetPayload().([]byte), body)
+
+		if err != nil {
+			return nil, err
+		}
+		if body.Meta == nil {
+			body.Meta = &proto.Meta{Puid: requestBody.Meta.Puid}
+		}
+
+		msg, err2 := proto2.Marshal(body)
+		if err2 != nil {
+			return nil, err2
+		}
+		msgBytes = msg
+	case rest.ContentTypeJSON:
+		requestBody := &proto.SeldonMessage{}
+		err := jsonpb.UnmarshalString(string(reqPayload.GetPayload().([]byte)), requestBody)
+		if err != nil {
+			return nil, err
+		}
+
+		if requestBody.Meta == nil {
+			return oldPayload, nil
+		}
+
 		body := &proto.SeldonMessage{}
 		jsonpb.UnmarshalString(string(oldPayload.GetPayload().([]byte)), body)
 
@@ -78,15 +110,20 @@ func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.
 			body.Meta = &proto.Meta{Puid: requestBody.Meta.Puid}
 		}
 
-		msg, err2 := new(jsonpb.Marshaler).MarshalToString(body)
-		if err2 != nil {
-			return nil, err2
+		msg, err := new(jsonpb.Marshaler).MarshalToString(body)
+		if err != nil {
+			return nil, err
 		}
+		msgBytes = []byte(msg)
 
-		updatedPayload := &payload.BytesPayload{
-			Msg:             []byte(msg),
-			ContentType:     oldPayload.GetContentType(),
-			ContentEncoding: oldPayload.GetContentEncoding()}
-		return updatedPayload, nil
+	default:
+		err := fmt.Errorf("unknown payload type '%s'", oldPayload.GetContentType())
+		return nil, err
 	}
+
+	updatedPayload := &payload.BytesPayload{
+		Msg:             msgBytes,
+		ContentType:     oldPayload.GetContentType(),
+		ContentEncoding: oldPayload.GetContentEncoding()}
+	return updatedPayload, nil
 }

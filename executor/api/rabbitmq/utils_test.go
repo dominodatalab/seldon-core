@@ -104,10 +104,11 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 			},
 		},
 	}
-	reqMessage, _ := new(jsonpb.Marshaler).MarshalToString(reqSeldonMessage)
-	reqPayload := &payload.BytesPayload{Msg: []byte(reqMessage), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
 
-	t.Run("Update Meta with Puid when response payload metadata is nil", func(t *testing.T) {
+	t.Run("Json: Update Meta with Puid when response payload metadata is nil", func(t *testing.T) {
+		reqMessage, _ := new(jsonpb.Marshaler).MarshalToString(reqSeldonMessage)
+		reqPayload := &payload.BytesPayload{Msg: []byte(reqMessage), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
+
 		protoMessage := &proto.SeldonMessage{
 			Status: &proto.Status{
 				Status: proto.Status_SUCCESS,
@@ -142,7 +143,10 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		assert.Equal(t, updatedMessage, expectedMessage)
 	})
 
-	t.Run("Do not update Meta with Puid when response meta is not nil", func(t *testing.T) {
+	t.Run("Json: Do not update Meta with Puid when response meta is not nil", func(t *testing.T) {
+		reqMessage, _ := new(jsonpb.Marshaler).MarshalToString(reqSeldonMessage)
+		reqPayload := &payload.BytesPayload{Msg: []byte(reqMessage), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
+
 		protoMessage := &proto.SeldonMessage{
 			Status: &proto.Status{
 				Status: proto.Status_SUCCESS,
@@ -167,7 +171,7 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		assert.Equal(t, protoMessage, updatedMessage)
 	})
 
-	t.Run("Have empty metadata if response metadata is empty", func(t *testing.T) {
+	t.Run("Json: Have empty metadata if response metadata is empty", func(t *testing.T) {
 		reqSeldonMessage := &proto.SeldonMessage{
 			Status: nil,
 			Meta:   nil,
@@ -204,4 +208,107 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		assert.Equal(t, protoMessage, updatedMessage)
 	})
 
+	t.Run("Protobuf: Update Meta with Puid when response payload metadata is nil", func(t *testing.T) {
+		reqMessage, _ := proto2.Marshal(reqSeldonMessage)
+		reqPayload := &payload.BytesPayload{Msg: reqMessage, ContentType: payload.APPLICATION_TYPE_PROTOBUF, ContentEncoding: ""}
+
+		protoMessage := &proto.SeldonMessage{
+			Status: &proto.Status{
+				Status: proto.Status_SUCCESS,
+			},
+			Meta: nil,
+			DataOneof: &proto.SeldonMessage_StrData{
+				StrData: strMessage,
+			},
+		}
+		msg, _ := proto2.Marshal(protoMessage)
+		oldPayload := &payload.BytesPayload{Msg: msg, ContentType: payload.APPLICATION_TYPE_PROTOBUF, ContentEncoding: ""}
+
+		updatedPayload, err := UpdatePayloadWithPuid(reqPayload, oldPayload)
+		assert.NoError(t, err)
+
+		updatedMessage := &proto.SeldonMessage{}
+		err2 := proto2.Unmarshal(updatedPayload.GetPayload().([]byte), updatedMessage)
+		assert.NoError(t, err2)
+
+		expectedMessage := &proto.SeldonMessage{
+			Status: &proto.Status{
+				Status: proto.Status_SUCCESS,
+			},
+			Meta: &proto.Meta{
+				Puid: puid,
+			},
+			DataOneof: &proto.SeldonMessage_StrData{
+				StrData: strMessage,
+			},
+		}
+
+		assert.Equal(t, updatedMessage, expectedMessage)
+	})
+
+	t.Run("Protobuf: Do not update Meta with Puid when response meta is not nil", func(t *testing.T) {
+		reqMessage, _ := proto2.Marshal(reqSeldonMessage)
+		reqPayload := &payload.BytesPayload{Msg: reqMessage, ContentType: payload.APPLICATION_TYPE_PROTOBUF, ContentEncoding: ""}
+
+		protoMessage := &proto.SeldonMessage{
+			Status: &proto.Status{
+				Status: proto.Status_SUCCESS,
+			},
+			Meta: &proto.Meta{
+				Puid: "789",
+			},
+			DataOneof: &proto.SeldonMessage_StrData{
+				StrData: strMessage,
+			},
+		}
+		msg, _ := proto2.Marshal(protoMessage)
+		oldPayload := &payload.BytesPayload{Msg: msg, ContentType: payload.APPLICATION_TYPE_PROTOBUF, ContentEncoding: ""}
+
+		updatedPayload, err := UpdatePayloadWithPuid(reqPayload, oldPayload)
+		assert.NoError(t, err)
+
+		updatedMessage := &proto.SeldonMessage{}
+		err2 := proto2.Unmarshal(updatedPayload.GetPayload().([]byte), updatedMessage)
+		assert.NoError(t, err2)
+
+		assert.Equal(t, oldPayload, updatedPayload)
+	})
+
+	t.Run("Protobuf: Have empty metadata if response metadata is empty", func(t *testing.T) {
+		reqSeldonMessage := &proto.SeldonMessage{
+			Status: nil,
+			Meta:   nil,
+			DataOneof: &proto.SeldonMessage_JsonData{
+				JsonData: &structpb.Value{
+					Kind: &structpb.Value_StringValue{
+						StringValue: strMessage,
+					},
+				},
+			},
+		}
+
+		reqMessage, _ := proto2.Marshal(reqSeldonMessage)
+		reqPayload := &payload.BytesPayload{Msg: reqMessage, ContentType: payload.APPLICATION_TYPE_PROTOBUF, ContentEncoding: ""}
+
+		protoMessage := &proto.SeldonMessage{
+			Status: &proto.Status{
+				Status: proto.Status_SUCCESS,
+			},
+			Meta: nil,
+			DataOneof: &proto.SeldonMessage_StrData{
+				StrData: strMessage,
+			},
+		}
+		msg, _ := proto2.Marshal(protoMessage)
+		oldPayload := &payload.BytesPayload{Msg: msg, ContentType: payload.APPLICATION_TYPE_PROTOBUF, ContentEncoding: ""}
+
+		updatedPayload, err := UpdatePayloadWithPuid(reqPayload, oldPayload)
+		assert.NoError(t, err)
+
+		updatedMessage := &proto.SeldonMessage{}
+		err2 := proto2.Unmarshal(updatedPayload.GetPayload().([]byte), updatedMessage)
+		assert.NoError(t, err2)
+
+		assert.Equal(t, oldPayload, updatedPayload)
+	})
 }
