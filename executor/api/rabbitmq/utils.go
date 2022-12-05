@@ -60,7 +60,6 @@ func DeliveryToPayload(delivery amqp.Delivery) (*SeldonPayloadWithHeaders, error
 }
 
 func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.SeldonPayload) (payload.SeldonPayload, error) {
-
 	var msgBytes []byte
 	switch oldPayload.GetContentType() {
 	case payload.APPLICATION_TYPE_PROTOBUF:
@@ -76,17 +75,17 @@ func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.
 
 		body := &proto.SeldonMessage{}
 		err = proto2.Unmarshal(oldPayload.GetPayload().([]byte), body)
-
 		if err != nil {
 			return nil, err
 		}
+
 		if body.Meta == nil {
 			body.Meta = &proto.Meta{Puid: requestBody.Meta.Puid}
 		}
 
-		msg, err2 := proto2.Marshal(body)
-		if err2 != nil {
-			return nil, err2
+		msg, err := proto2.Marshal(body)
+		if err != nil {
+			return nil, err
 		}
 		msgBytes = msg
 	case rest.ContentTypeJSON:
@@ -102,10 +101,10 @@ func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.
 
 		body := &proto.SeldonMessage{}
 		jsonpb.UnmarshalString(string(oldPayload.GetPayload().([]byte)), body)
-
 		if err != nil {
 			return nil, err
 		}
+
 		if body.Meta == nil {
 			body.Meta = &proto.Meta{Puid: requestBody.Meta.Puid}
 		}
@@ -115,7 +114,6 @@ func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.
 			return nil, err
 		}
 		msgBytes = []byte(msg)
-
 	default:
 		err := fmt.Errorf("unknown payload type '%s'", oldPayload.GetContentType())
 		return nil, err

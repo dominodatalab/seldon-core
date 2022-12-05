@@ -195,8 +195,6 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		rs.Log.Error(err, UNDHANDLED_ERROR)
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
-	e, err := resPayload.GetBytes()
-	rs.Log.Info("Seldon response ", "resPayload", string(e[:]))
 
 	updatedPayload, err := UpdatePayloadWithPuid(reqPayload, resPayload)
 	if err != nil {
@@ -243,7 +241,6 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 			Msg:         []byte(jsonStr),
 			ContentType: rest.ContentTypeJSON,
 		}
-
 		break
 	}
 
