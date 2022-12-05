@@ -61,7 +61,7 @@ func DeliveryToPayload(delivery amqp.Delivery) (*SeldonPayloadWithHeaders, error
 
 func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.SeldonPayload) (payload.SeldonPayload, error) {
 	var msgBytes []byte
-	switch oldPayload.GetContentType() {
+	switch reqPayload.GetContentType() {
 	case payload.APPLICATION_TYPE_PROTOBUF:
 		requestBody := &proto.SeldonMessage{}
 		err := proto2.Unmarshal(reqPayload.GetPayload().([]byte), requestBody)

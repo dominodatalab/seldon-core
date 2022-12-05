@@ -196,6 +196,9 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
 
+	rs.Log.Error(err, resPayload.GetContentType())
+	rs.Log.Error(err, reqPayload.GetContentType())
+
 	updatedPayload, err := UpdatePayloadWithPuid(reqPayload, resPayload)
 	if err != nil {
 		rs.Log.Error(err, UNDHANDLED_ERROR)
