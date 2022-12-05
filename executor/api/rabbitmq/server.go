@@ -246,13 +246,7 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 			Msg:         []byte(jsonStr),
 			ContentType: rest.ContentTypeJSON,
 		}
-
-		resPayload, err = UpdatePayloadWithPuid(reqPayload, resPayload)
-		if err != nil {
-			rs.Log.Error(err, UNDHANDLED_ERROR)
-			return fmt.Errorf("unhandled error %w from predictor process", err)
-		}
-
+		
 		break
 	}
 
