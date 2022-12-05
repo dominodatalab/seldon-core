@@ -8,6 +8,7 @@ import (
 	"github.com/seldonio/seldon-core/executor/api/payload"
 	"github.com/seldonio/seldon-core/executor/api/rest"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"testing"
 )
@@ -87,10 +88,26 @@ func TestDeliveryToPayload(t *testing.T) {
 }
 
 func TestUpdatePayloadWithPuid(t *testing.T) {
-	strMessage := `"goodbye"`
+	strMessage := `"test"`
 	puid := "123"
 
-	t.Run("Update Meta with Puid when meta is nil", func(t *testing.T) {
+	reqSeldonMessage := &proto.SeldonMessage{
+		Status: nil,
+		Meta: &proto.Meta{
+			Puid: puid,
+		},
+		DataOneof: &proto.SeldonMessage_JsonData{
+			JsonData: &structpb.Value{
+				Kind: &structpb.Value_StringValue{
+					StringValue: strMessage,
+				},
+			},
+		},
+	}
+	reqMessage, _ := new(jsonpb.Marshaler).MarshalToString(reqSeldonMessage)
+	reqPayload := &payload.BytesPayload{Msg: []byte(reqMessage), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
+
+	t.Run("Update Meta with Puid when response payload metadata is nil", func(t *testing.T) {
 		protoMessage := &proto.SeldonMessage{
 			Status: &proto.Status{
 				Status: proto.Status_SUCCESS,
@@ -103,7 +120,7 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		msg, _ := new(jsonpb.Marshaler).MarshalToString(protoMessage)
 		oldPayload := &payload.BytesPayload{Msg: []byte(msg), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
 
-		updatedPayload, err := UpdatePayloadWithPuid(oldPayload, puid)
+		updatedPayload, err := UpdatePayloadWithPuid(reqPayload, oldPayload)
 		assert.NoError(t, err)
 
 		updatedMessage := &proto.SeldonMessage{}
@@ -125,13 +142,13 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		assert.Equal(t, updatedMessage, expectedMessage)
 	})
 
-	t.Run("Do not update Meta with Puid when meta is not nil", func(t *testing.T) {
+	t.Run("Do not update Meta with Puid when response meta is not nil", func(t *testing.T) {
 		protoMessage := &proto.SeldonMessage{
 			Status: &proto.Status{
 				Status: proto.Status_SUCCESS,
 			},
 			Meta: &proto.Meta{
-				Puid: puid,
+				Puid: "789",
 			},
 			DataOneof: &proto.SeldonMessage_StrData{
 				StrData: strMessage,
@@ -140,7 +157,7 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		msg, _ := new(jsonpb.Marshaler).MarshalToString(protoMessage)
 		oldPayload := &payload.BytesPayload{Msg: []byte(msg), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
 
-		updatedPayload, err := UpdatePayloadWithPuid(oldPayload, "789")
+		updatedPayload, err := UpdatePayloadWithPuid(reqPayload, oldPayload)
 		assert.NoError(t, err)
 
 		updatedMessage := &proto.SeldonMessage{}
@@ -148,6 +165,43 @@ func TestUpdatePayloadWithPuid(t *testing.T) {
 		assert.NoError(t, err2)
 
 		assert.Equal(t, protoMessage, updatedMessage)
-		assert.NotEqual(t, updatedMessage.Meta.Puid, "789")
 	})
+
+	t.Run("Have empty metadata if response metadata is empty", func(t *testing.T) {
+		reqSeldonMessage := &proto.SeldonMessage{
+			Status: nil,
+			Meta:   nil,
+			DataOneof: &proto.SeldonMessage_JsonData{
+				JsonData: &structpb.Value{
+					Kind: &structpb.Value_StringValue{
+						StringValue: strMessage,
+					},
+				},
+			},
+		}
+		reqMessage, _ := new(jsonpb.Marshaler).MarshalToString(reqSeldonMessage)
+		reqPayload := &payload.BytesPayload{Msg: []byte(reqMessage), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
+
+		protoMessage := &proto.SeldonMessage{
+			Status: &proto.Status{
+				Status: proto.Status_SUCCESS,
+			},
+			Meta: nil,
+			DataOneof: &proto.SeldonMessage_StrData{
+				StrData: strMessage,
+			},
+		}
+		msg, _ := new(jsonpb.Marshaler).MarshalToString(protoMessage)
+		oldPayload := &payload.BytesPayload{Msg: []byte(msg), ContentType: rest.ContentTypeJSON, ContentEncoding: ""}
+
+		updatedPayload, err := UpdatePayloadWithPuid(reqPayload, oldPayload)
+		assert.NoError(t, err)
+
+		updatedMessage := &proto.SeldonMessage{}
+		err2 := jsonpb.UnmarshalString(string(updatedPayload.GetPayload().([]byte)), updatedMessage)
+		assert.NoError(t, err2)
+
+		assert.Equal(t, protoMessage, updatedMessage)
+	})
+
 }

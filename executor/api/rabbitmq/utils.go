@@ -59,25 +59,34 @@ func DeliveryToPayload(delivery amqp.Delivery) (*SeldonPayloadWithHeaders, error
 	return pl, err
 }
 
-func UpdatePayloadWithPuid(oldPayload payload.SeldonPayload, seldonPuid string) (payload.SeldonPayload, error) {
-	body := &proto.SeldonMessage{}
-	err := jsonpb.UnmarshalString(string(oldPayload.GetPayload().([]byte)), body)
-
+func UpdatePayloadWithPuid(reqPayload payload.SeldonPayload, oldPayload payload.SeldonPayload) (payload.SeldonPayload, error) {
+	requestBody := &proto.SeldonMessage{}
+	err := jsonpb.UnmarshalString(string(reqPayload.GetPayload().([]byte)), requestBody)
 	if err != nil {
 		return nil, err
 	}
-	if body.Meta == nil {
-		body.Meta = &proto.Meta{Puid: seldonPuid}
-	}
+	if requestBody.Meta == nil {
+		return oldPayload, nil
+	} else {
+		body := &proto.SeldonMessage{}
+		jsonpb.UnmarshalString(string(oldPayload.GetPayload().([]byte)), body)
 
-	msg, err2 := new(jsonpb.Marshaler).MarshalToString(body)
-	if err2 != nil {
-		return nil, err2
-	}
+		if err != nil {
+			return nil, err
+		}
+		if body.Meta == nil {
+			body.Meta = &proto.Meta{Puid: requestBody.Meta.Puid}
+		}
 
-	updatedPayload := &payload.BytesPayload{
-		Msg:             []byte(msg),
-		ContentType:     oldPayload.GetContentType(),
-		ContentEncoding: oldPayload.GetContentEncoding()}
-	return updatedPayload, nil
+		msg, err2 := new(jsonpb.Marshaler).MarshalToString(body)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		updatedPayload := &payload.BytesPayload{
+			Msg:             []byte(msg),
+			ContentType:     oldPayload.GetContentType(),
+			ContentEncoding: oldPayload.GetContentEncoding()}
+		return updatedPayload, nil
+	}
 }
