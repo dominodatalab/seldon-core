@@ -173,6 +173,10 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	}
 
 	seldonPuid := assignAndReturnPUID(reqPayload, nil)
+	rs.Log.Info("Seldon PUID", "seldon puid", seldonPuid)
+	b, err := reqPayload.GetBytes()
+	rs.Log.Info("Seldon message ", "reqPayload", string(b[:]))
+
 	ctx := context.WithValue(context.Background(), payload.SeldonPUIDHeader, seldonPuid)
 
 	// Apply tracing if active
@@ -194,6 +198,8 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		rs.Log.Error(err, UNDHANDLED_ERROR)
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
+	e, err := resPayload.GetBytes()
+	rs.Log.Info("Seldon response ", "resPayload", string(e[:]))
 
 	updatedPayload, err := UpdatePayloadWithPuid(resPayload, seldonPuid)
 	if err != nil {
@@ -243,13 +249,7 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 		break
 	}
 
-	updatedPayload, err := UpdatePayloadWithPuid(resPayload, seldonPuid)
-	if err != nil {
-		rs.Log.Error(err, UNDHANDLED_ERROR)
-		return fmt.Errorf("unhandled error %w from predictor process", err)
-	}
-
-	return publishPayload(publisher, updatedPayload, seldonPuid)
+	return publishPayload(publisher, resPayload, seldonPuid)
 }
 
 func assignAndReturnPUID(pl *SeldonPayloadWithHeaders, delivery *amqp.Delivery) string {
