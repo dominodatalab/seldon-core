@@ -546,13 +546,14 @@ func (m *SeldonMessageList) GetSeldonMessages() []*SeldonMessage {
 }
 
 type Status struct {
-	Code                 int32             `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Info                 string            `protobuf:"bytes,2,opt,name=info,proto3" json:"info,omitempty"`
-	Reason               string            `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	Status               Status_StatusFlag `protobuf:"varint,4,opt,name=status,proto3,enum=seldon.protos.Status_StatusFlag" json:"status,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_unrecognized     []byte            `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
+	Code   int32             `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Info   string            `protobuf:"bytes,2,opt,name=info,proto3" json:"info,omitempty"`
+	Reason string            `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	Status Status_StatusFlag `protobuf:"varint,4,opt,name=status,proto3,enum=seldon.protos.Status_StatusFlag" json:"status,omitempty"`
+	//Status               string
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *Status) Reset()         { *m = Status{} }

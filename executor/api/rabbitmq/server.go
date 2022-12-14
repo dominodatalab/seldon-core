@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang/protobuf/jsonpb"
@@ -14,6 +15,7 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seldonio/seldon-core/executor/api/grpc/seldon/proto"
+	"github.com/seldonio/seldon-core/executor/k8s"
 
 	"github.com/go-logr/logr"
 	"github.com/seldonio/seldon-core/executor/api"
@@ -197,7 +199,11 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	arrBytes, e := resPayload.GetBytes()
 	rs.Log.Info("KARTIK Test")
 	if e == nil {
-		if len(arrBytes) > 1 {
+		annotations, _ := k8s.GetAnnotations()
+		msgLimit := annotations["seldon.io/rabbitmq-max-message-size-in-bytes"]
+		intMsgLimit, _ := strconv.Atoi(msgLimit)
+		rs.Log.Info("KARTIK msg limit is %s", msgLimit)
+		if len(arrBytes) > intMsgLimit {
 			message := &proto.SeldonMessage{
 				Status: &proto.Status{
 					Code:   -1,
