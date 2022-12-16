@@ -34,7 +34,7 @@ const (
 	ENV_RABBITMQ_INPUT_QUEUE  = "RABBITMQ_INPUT_QUEUE"
 	ENV_RABBITMQ_OUTPUT_QUEUE = "RABBITMQ_OUTPUT_QUEUE"
 	ENV_RABBITMQ_FULL_GRAPH   = "RABBITMQ_FULL_GRAPH"
-	UNHANDLED_ERROR           = "Unhandled error from predictor process"
+	UNHANDLED_ERROR          = "Unhandled error from predictor process"
 )
 
 type SeldonRabbitMQServer struct {
@@ -213,7 +213,7 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 	message := &proto.SeldonMessage{
 		Status: &proto.Status{
 			Code:   0,
-			Info:   "handleConsumerErrorPrediction Failed",
+			Info:   "Prediction Failed",
 			Reason: errorArgs.err.Error(),
 			Status: proto.Status_FAILURE,
 		},
