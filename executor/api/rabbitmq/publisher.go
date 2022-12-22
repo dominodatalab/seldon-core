@@ -48,14 +48,10 @@ func (p *publisher) Publish(payload SeldonPayloadWithHeaders) error {
 	}
 
 	body, err := payload.GetBytes()
-	// if err == nil {
-	// 	p.log.Info("Kartik bytes written", "body:", body)
-	// }
 	if err != nil {
 		p.log.Error(err, "error retrieving payload bytes")
 		return fmt.Errorf("error '%w' retrieving payload bytes", err)
 	}
-	//p.log.Info("Kartik bytes written", "body:", body)
 	message := amqp.Publishing{
 		Headers:         StringMapToTable(payload.Headers),
 		ContentType:     payload.GetContentType(),
@@ -63,9 +59,7 @@ func (p *publisher) Publish(payload SeldonPayloadWithHeaders) error {
 		DeliveryMode:    amqp.Persistent,
 		Body:            body,
 	}
-	//p.log.Info("Kartik Message written", "message:", message.Body)
 	err = p.channel.Publish(amqpExchange, p.queueName, publishMandatory, publishImmediate, message)
-	//p.log.Info("Kartik Message written", "message:", message.Body)
 	if err != nil {
 		p.log.Error(err, "error publishing rabbitmq message")
 		return fmt.Errorf("error '%w' publishing rabbitmq message", err)
