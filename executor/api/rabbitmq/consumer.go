@@ -65,8 +65,6 @@ func (c *consumer) Consume(
 		return fmt.Errorf("error '%w' consuming from rabbitmq queue", err)
 	}
 
-	// TODO does this need more error handling?  What about if the connection or channel fail while
-	// the handler is running?
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -103,6 +101,12 @@ func (c *consumer) Consume(
 	}
 	close(sigChan)
 
+	select {
+	case err = <-c.err:
+		return fmt.Errorf("error '%w' with rabbitmq connection", err)
+	default:
+	}
+
 	return nil
 }
 
@@ -118,25 +122,16 @@ func (c *consumer) handleConsumerError(
 ) error {
 	delivery := args.delivery
 
-	// retry once
-	if delivery.Redelivered {
-		err := errorHandler(args)
-		if err != nil {
-			c.log.Error(err, "error handler encountered an error", "original error", args.err)
-			return fmt.Errorf("error handler encountered an error '%w' when handling original error '%v'", err, args.err)
-		}
+	err := errorHandler(args)
+	if err != nil {
+		c.log.Error(err, "error handler encountered an error", "original error", args.err)
+		return fmt.Errorf("error handler encountered an error '%w' when handling original error '%v'", err, args.err)
+	}
 
-		rejectErr := delivery.Reject(false)
-		if rejectErr != nil {
-			c.log.Error(rejectErr, "error rejecting")
-			return fmt.Errorf("error '%w' rejecting", rejectErr)
-		}
-	} else {
-		nackErr := delivery.Nack(false, true)
-		if nackErr != nil {
-			c.log.Error(nackErr, "error nack-ing")
-			return fmt.Errorf("error '%w' nack-ing", nackErr)
-		}
+	rejectErr := delivery.Reject(false)
+	if rejectErr != nil {
+		c.log.Error(rejectErr, "error rejecting")
+		return fmt.Errorf("error '%w' rejecting", rejectErr)
 	}
 
 	return nil

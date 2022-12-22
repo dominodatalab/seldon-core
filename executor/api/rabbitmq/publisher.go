@@ -67,7 +67,7 @@ func (p *publisher) Publish(payload SeldonPayloadWithHeaders) error {
 	err = p.channel.Publish(amqpExchange, p.queueName, publishMandatory, publishImmediate, message)
 	//p.log.Info("Kartik Message written", "message:", message.Body)
 	if err != nil {
-		p.log.Error(err, "error consuming from rabbitmq queue")
+		p.log.Error(err, "error publishing rabbitmq message")
 		return fmt.Errorf("error '%w' publishing rabbitmq message", err)
 	}
 	return nil

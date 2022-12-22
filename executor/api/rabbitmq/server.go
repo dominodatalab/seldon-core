@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -124,6 +125,11 @@ func (rs *SeldonRabbitMQServer) Serve() error {
 		rs.Log.Error(err, "error connecting to rabbitmq")
 		return fmt.Errorf("error '%w' connecting to rabbitmq", err)
 	}
+
+	go func() {
+		err := <-conn.err
+		log.Fatal("RabbitMQ connection died", err) // causes app to exit with error
+	}()
 
 	return rs.serve(conn)
 }
