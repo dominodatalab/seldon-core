@@ -3,6 +3,14 @@ package rabbitmq
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/go-logr/logr/testr"
 	guuid "github.com/google/uuid"
 	. "github.com/onsi/gomega"
@@ -14,13 +22,6 @@ import (
 	v1 "github.com/seldonio/seldon-core/operator/apis/machinelearning.seldon.io/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 var (

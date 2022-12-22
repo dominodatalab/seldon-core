@@ -37,7 +37,7 @@ const (
 	ENV_RABBITMQ_INPUT_QUEUE  = "RABBITMQ_INPUT_QUEUE"
 	ENV_RABBITMQ_OUTPUT_QUEUE = "RABBITMQ_OUTPUT_QUEUE"
 	ENV_RABBITMQ_FULL_GRAPH   = "RABBITMQ_FULL_GRAPH"
-	UNHANDLED_ERROR          = "Unhandled error from predictor process"
+	UNHANDLED_ERROR           = "Unhandled error from predictor process"
 )
 
 type SeldonRabbitMQServer struct {
@@ -199,22 +199,17 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
 	arrBytes, e := resPayload.GetBytes()
-	rs.Log.Info("KARTIK Test")
 	if e == nil {
 		annotations, _ := k8s.GetAnnotations()
 		msgLimit := annotations["seldon.io/rabbitmq-max-message-size-in-bytes"]
 		intMsgLimit, _ := strconv.Atoi(msgLimit)
-		rs.Log.Info("KARTIK msg limit is %s", msgLimit)
 		if len(arrBytes) > intMsgLimit {
 			message := &proto.SeldonMessage{
 				Status: &proto.Status{
 					Code:   -1,
-					Info:   "Payload is great than 10kb",
+					Info:   "Payload size is greater than 10kb",
 					Reason: "payload is large",
 					Status: proto.Status_FAILURE,
-				},
-				Meta: &proto.Meta{
-					Puid: seldonPuid,
 				},
 			}
 			jsonStr, err := new(jsonpb.Marshaler).MarshalToString(message)
@@ -223,10 +218,10 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 				return fmt.Errorf("error '%w' marshaling seldon message", err)
 			}
 			resPayload = &payload.BytesPayload{
-				Msg:         []byte(jsonStr),
-				ContentType: rest.ContentTypeJSON,
+				Msg:             []byte(jsonStr),
+				ContentType:     rest.ContentTypeJSON,
+				ContentEncoding: "",
 			}
-			//resPayload = &payload.ProtoPayload{Msg: message}
 		}
 	}
 
@@ -235,7 +230,6 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		rs.Log.Error(err, UNHANDLED_ERROR)
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
-
 	return publishPayload(publisher, updatedPayload, seldonPuid)
 }
 
