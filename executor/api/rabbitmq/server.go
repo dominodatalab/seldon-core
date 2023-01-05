@@ -209,6 +209,7 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		annotations, _ := k8s.GetAnnotations()
 		msgLimit := annotations["seldon.io/rabbitmq-max-message-size-in-bytes"]
 		intMsgLimit, _ := strconv.Atoi(msgLimit)
+		rs.Log.Info("Maximum allowed message size for rabbitmq", "rabbitmq-max-message-size-in-bytes", intMsgLimit)
 		if len(arrBytes) > intMsgLimit {
 			message := &proto.SeldonMessage{
 				Status: &proto.Status{
