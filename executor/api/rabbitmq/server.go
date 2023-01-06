@@ -205,30 +205,31 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
 	arrBytes, e := resPayload.GetBytes()
-	if e == nil {
-		annotations, _ := k8s.GetAnnotations()
-		msgLimit := annotations["seldon.io/rabbitmq-max-message-size-in-bytes"]
-		intMsgLimit, _ := strconv.Atoi(msgLimit)
-		rs.Log.Info("Maximum allowed message size for rabbitmq", "rabbitmq-max-message-size-in-bytes", intMsgLimit)
-		if len(arrBytes) > intMsgLimit {
-			message := &proto.SeldonMessage{
-				Status: &proto.Status{
-					Code:   -1,
-					Info:   "Payload size is greater than 10kb",
-					Reason: "payload is large",
-					Status: proto.Status_FAILURE,
-				},
-			}
-			jsonStr, err := new(jsonpb.Marshaler).MarshalToString(message)
-			if err != nil {
-				rs.Log.Error(err, "error marshaling seldon message")
-				return fmt.Errorf("error '%w' marshaling seldon message", err)
-			}
-			resPayload = &payload.BytesPayload{
-				Msg:             []byte(jsonStr),
-				ContentType:     rest.ContentTypeJSON,
-				ContentEncoding: "",
-			}
+	if e != nil {
+		return fmt.Errorf("error '%w' unmarshaling seldon payload", e)
+	}
+	annotations, _ := k8s.GetAnnotations()
+	msgLimit := annotations[k8s.ANNOTATION_RABBITMQ_MAX_MESSAGE_SIZE]
+	intMsgLimit, _ := strconv.Atoi(msgLimit)
+	rs.Log.Info("Maximum allowed message size for rabbitmq", "rabbitmq-max-message-size-in-bytes", intMsgLimit)
+	if len(arrBytes) > intMsgLimit {
+		message := &proto.SeldonMessage{
+			Status: &proto.Status{
+				Code:   -1,
+				Info:   "Payload size is greater than 10kb",
+				Reason: "payload is large",
+				Status: proto.Status_FAILURE,
+			},
+		}
+		jsonStr, err := new(jsonpb.Marshaler).MarshalToString(message)
+		if err != nil {
+			rs.Log.Error(err, "error marshaling seldon message")
+			return fmt.Errorf("error '%w' marshaling seldon message", err)
+		}
+		resPayload = &payload.BytesPayload{
+			Msg:             []byte(jsonStr),
+			ContentType:     rest.ContentTypeJSON,
+			ContentEncoding: "",
 		}
 	}
 
