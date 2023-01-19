@@ -209,8 +209,13 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		return fmt.Errorf("error '%w' unmarshaling seldon payload", e)
 	}
 	annotations, _ := k8s.GetAnnotations()
+
 	msgLimit := annotations[k8s.ANNOTATION_RABBITMQ_MAX_MESSAGE_SIZE]
-	intMsgLimit, _ := strconv.Atoi(msgLimit)
+	intMsgLimit, e := strconv.Atoi(msgLimit)
+	if intMsgLimit == 0 || e != nil {
+		rs.Log.Info("Unable to read annotation for maximum size defaulting to 10KB", "rabbitmq-max-message-size-in-bytes", intMsgLimit)
+		intMsgLimit = k8s.DEFAULT_MSG_MAX_SIZE_BYTES
+	}
 	rs.Log.Info("Maximum allowed message size for rabbitmq", "rabbitmq-max-message-size-in-bytes", intMsgLimit)
 	if len(arrBytes) > intMsgLimit {
 		message := &proto.SeldonMessage{

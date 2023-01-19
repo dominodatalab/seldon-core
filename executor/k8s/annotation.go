@@ -13,6 +13,7 @@ const (
 	ANNOTATION_RABBITMQ_MAX_MESSAGE_SIZE = "seldon.io/rabbitmq-max-message-size-in-bytes"
 	ANNOTATION_GRPC_TIMEOUT              = "seldon.io/grpc-timeout"
 	ANNOTATION_REST_TIMEOUT              = "seldon.io/rest-timeout"
+	DEFAULT_MSG_MAX_SIZE_BYTES           = 10240
 )
 
 func trimQuotes(v string) string {
