@@ -213,7 +213,7 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	msgLimit := annotations[k8s.ANNOTATION_RABBITMQ_MAX_MESSAGE_SIZE]
 	intMsgLimit, e := strconv.Atoi(msgLimit)
 	if intMsgLimit == 0 || e != nil {
-		rs.Log.Info("Failed to read maximum allowed message size defaulting to 10240 Bytes", "msg-size-found", intMsgLimit)
+		rs.Log.Info("Failed to read maximum allowed message size defaulting to 10240 bytes", "msg-size-found", intMsgLimit)
 		intMsgLimit = DEFAULT_MAX_MSG_SIZE_BYTES
 	}
 	rs.Log.Info("Maximum allowed message size for rabbitmq", "rabbitmq-max-message-size-in-bytes", intMsgLimit)
