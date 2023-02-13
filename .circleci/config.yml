@@ -12,7 +12,7 @@ parameters:
 jobs:
   build-and-push:
     docker:
-     - image: cimg/base:2022.08
+     - image: cimg/base:2023.02
     resource_class: medium
     steps:
       - go/install:
@@ -27,7 +27,7 @@ jobs:
             $SUDO chmod +x ./kustomize
             $SUDO mv ./kustomize /usr/local/bin
       - setup_remote_docker:
-          version: 20.10.14
+          version: 23.0.1
           docker_layer_caching: true
       - checkout
       - run:
@@ -89,32 +89,24 @@ jobs:
   integration-test:
     docker:
      # - image: tiltdev/circleci-kind:v1.4.0
-      - image: cimg/base:2022.08
+      - image: cimg/base:2023.02
 
     steps:
       - setup_remote_docker:
-          version: 20.10.14
+          version: 23.0.1
           docker_layer_caching: true
       - checkout
       - run:
-          name: Install KinD
+          name: Docker login
+          command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+      - run:
+          name: Install kind
           command: |
             curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/0.17.0/kind-linux-amd64
             chmod +x kind
             sudo mv kind /usr/local/bin/
       - run:
-          name: Install KinD
-          command: |
-            curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/0.17.0/kind-linux-amd64
-            chmod +x kind
-            sudo mv kind /usr/local/bin/
-      - run:
-          name: Install make
-          command: |
-            sudo apt-get update -y
-            sudo apt-get install -y build-essential
-      - run:
-          name: setup
+          name: kind_test_setup
           working_directory: ./testing/scripts
           command: ./kind_test_setup.sh
       - run:
