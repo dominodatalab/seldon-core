@@ -115,10 +115,12 @@ jobs:
             sudo apt-get install -y build-essential
       - run:
           name: setup
-          command: ./testing/scripts/kind_test_setup.sh
+          working_directory: ./testing/scripts
+          command: ./kind_test_setup.sh
       - run:
-          name: test_p
-          command: ./testing/scripts/make test_parallel
+          name: test_parallel
+          working_directory: ./testing/scripts
+          command: ./make test_parallel
 
 
 workflows:
