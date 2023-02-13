@@ -85,6 +85,21 @@ jobs:
           name: Teardown
           command: ./test/seldon/setup/uninstall-all
 
+  integration-test:
+    docker:
+      - image: tiltdev/circleci-kind:v1.4.0
+
+    steps:
+      - setup_remote_docker
+      - checkout
+      - run:
+          name: setup
+          command: ./testing/scripts/kind_test_setup.sh
+      - run:
+          name: test_p
+          command: ./testing/scripts/make test_parallel
+
+
 workflows:
   version: 2
   main:
@@ -96,6 +111,14 @@ workflows:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
       - test:
+          context:
+            - org-global
+          requires:
+            - build-and-push
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
+      - integration-test:
           context:
             - org-global
           requires:
