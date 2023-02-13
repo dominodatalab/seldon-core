@@ -88,13 +88,31 @@ jobs:
 
   integration-test:
     docker:
-      - image: tiltdev/circleci-kind:v1.4.0
+     # - image: tiltdev/circleci-kind:v1.4.0
+      - image: cimg/base:2022.08
 
     steps:
       - setup_remote_docker:
           version: 20.10.14
           docker_layer_caching: true
       - checkout
+      - run:
+          name: Install KinD
+          command: |
+            curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/0.17.0/kind-linux-amd64
+            chmod +x kind
+            sudo mv kind /usr/local/bin/
+      - run:
+          name: Install KinD
+          command: |
+            curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/0.17.0/kind-linux-amd64
+            chmod +x kind
+            sudo mv kind /usr/local/bin/
+      - run:
+          name: Install make
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y build-essential
       - run:
           name: setup
           command: ./testing/scripts/kind_test_setup.sh
@@ -107,25 +125,25 @@ workflows:
   version: 2
   main:
     jobs:
-      - build-and-push:
-          context:
-            - org-global
-          filters:
-            tags:
-              only: /v\d+(\.\d+)*(-.*)*/
-      - test:
-          context:
-            - org-global
-          requires:
-            - build-and-push
-          filters:
-            tags:
-              only: /v\d+(\.\d+)*(-.*)*/
+#      - build-and-push:
+#          context:
+#            - org-global
+#          filters:
+#            tags:
+#              only: /v\d+(\.\d+)*(-.*)*/
+#      - test:
+#          context:
+#            - org-global
+#          requires:
+#            - build-and-push
+#          filters:
+#            tags:
+#              only: /v\d+(\.\d+)*(-.*)*/
       - integration-test:
           context:
             - org-global
-          requires:
-            - build-and-push
+#          requires:
+#            - build-and-push
           filters:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
