@@ -108,7 +108,8 @@ jobs:
       - run:
           name: Install kubectl
           command: |
-            sudo apt-get install -y kubectl
+            curl -LO https://dl.k8s.io/release/v1.25.3/bin/linux/amd64/kubectl
+            sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
       - run:
           name: kind_test_setup
           working_directory: ./testing/scripts
