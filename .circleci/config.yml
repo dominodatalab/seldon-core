@@ -43,7 +43,7 @@ jobs:
 
   test:
     machine:
-      image: ubuntu-2004:current
+      image: ubuntu-2204:current
     environment:
       KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
       KUSTOMIZE_VERSION: "v4.3.0"
@@ -87,8 +87,8 @@ jobs:
           command: ./test/seldon/setup/uninstall-all
 
   integration-test:
-    docker:
-      - image: cimg/base:2023.02
+    machine:
+      image: ubuntu-2204:current
     resource_class: large
     steps:
 #      - setup_remote_docker:
