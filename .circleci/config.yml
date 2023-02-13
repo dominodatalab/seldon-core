@@ -106,6 +106,10 @@ jobs:
             chmod +x kind
             sudo mv kind /usr/local/bin/
       - run:
+          name: Install kubectl
+          command: |
+            sudo apt-get install -y kubectl
+      - run:
           name: kind_test_setup
           working_directory: ./testing/scripts
           command: ./kind_test_setup.sh
