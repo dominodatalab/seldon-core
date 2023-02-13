@@ -90,7 +90,7 @@ jobs:
     docker:
      # - image: tiltdev/circleci-kind:v1.4.0
       - image: cimg/base:2023.02
-
+    resource_class: xlarge
     steps:
       - setup_remote_docker:
           version: 20.10.18
