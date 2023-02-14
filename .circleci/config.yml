@@ -113,9 +113,18 @@ jobs:
             curl -LO https://dl.k8s.io/release/v1.25.3/bin/linux/amd64/kubectl
             sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
       - run:
+          name: Install kustomize
+          command: |
+            URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
+            curl -L $URL | tar zx
+
+            [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
+            $SUDO chmod +x ./kustomize
+            $SUDO mv ./kustomize /usr/local/bin
+      - run:
           name: Install python
           command: |
-            sudo apt install -y python-is-python3
+            sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
       - run:
           name: kind_test_setup
           working_directory: ./testing/scripts
