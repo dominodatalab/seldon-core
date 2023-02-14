@@ -27,5 +27,5 @@ kubeadmConfigPatches:
         memory.available:  "1Mi"
         nodefs.available: "0%"
     featureGates:
-        DynamicKubeletConfig: true
+#        DynamicKubeletConfig: true
         RotateKubeletServerCertificate: true
