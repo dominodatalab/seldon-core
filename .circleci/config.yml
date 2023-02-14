@@ -131,6 +131,11 @@ jobs:
             sudo apt install -y python3-pip
             pip install --user pytest grpcio-tools
       - run:
+          name: Install s2i
+          command: |
+            curl -L https://github.com/openshift/source-to-image/releases/download/v1.3.2/source-to-image-v1.3.2-78363eee-linux-amd64.tar.gz | tar -xz
+            sudo mv ./s2i /usr/local/bin
+      - run:
           name: kind_test_setup
           working_directory: ./testing/scripts
           command: ./kind_test_setup.sh
