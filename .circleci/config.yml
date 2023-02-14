@@ -95,9 +95,9 @@ jobs:
 #      - image: cimg/base:2023.02
     resource_class: large
     steps:
-#      - setup_remote_docker:
-#          version: 20.10.18
-#          docker_layer_caching: true
+      - setup_remote_docker:
+          version: 20.10.18
+          docker_layer_caching: true
       - checkout
 #      - go/install:
 #          version: "1.17"
