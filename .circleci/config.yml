@@ -122,9 +122,12 @@ jobs:
             $SUDO chmod +x ./kustomize
             $SUDO mv ./kustomize /usr/local/bin
       - run:
-          name: Install python
+          name: Link python & install deps
           command: |
             sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+            sudo apt update
+            sudo apt install -y python3-pip
+            pip install --user pytest grpcio-tools
       - run:
           name: kind_test_setup
           working_directory: ./testing/scripts
