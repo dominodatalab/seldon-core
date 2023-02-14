@@ -97,6 +97,8 @@ jobs:
           version: 20.10.18
           docker_layer_caching: true
       - checkout
+      - go/install:
+          version: "1.17"
       - run:
           name: Docker login
           command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
