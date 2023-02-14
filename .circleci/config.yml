@@ -88,61 +88,72 @@ jobs:
 
   integration-test:
 #    machine:
+#      image: seldonio/core-builder:0.27
 #      image: ubuntu-2204:current
     docker:
-      - image: cimg/base:2023.02
+      - image: seldonio/core-builder:0.27
+#      - image: cimg/base:2023.02
     resource_class: large
     steps:
-      - setup_remote_docker:
-          version: 20.10.18
-          docker_layer_caching: true
+#      - setup_remote_docker:
+#          version: 20.10.18
+#          docker_layer_caching: true
       - checkout
-      - go/install:
-          version: "1.17"
+#      - go/install:
+#          version: "1.17"
       - run:
           name: Docker login
           command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+#      - run:
+#          name: Install kind
+#          command: |
+#            curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.17.0/kind-linux-amd64
+#            chmod +x kind
+#            sudo mv kind /usr/local/bin/
+#            echo "export KUBECONFIG='$(kind get kubeconfig-path)'" >> $BASH_ENV
+#      - run:
+#          name: Install kubectl
+#          command: |
+#            curl -LO https://dl.k8s.io/release/v1.25.3/bin/linux/amd64/kubectl
+#            sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+#      - run:
+#          name: Install kustomize
+#          command: |
+#            URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
+#            curl -L $URL | tar zx
+#
+#            [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
+#            $SUDO chmod +x ./kustomize
+#            $SUDO mv ./kustomize /usr/local/bin
+#      - run:
+#          name: Link python & install deps
+#          command: |
+#            sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+#            sudo apt update
+#            sudo apt install -y python3-pip
+#            pip install --user pytest grpcio-tools
+#      - run:
+#          name: Install s2i
+#          command: |
+#            curl -L https://github.com/openshift/source-to-image/releases/download/v1.3.2/source-to-image-v1.3.2-78363eee-linux-amd64.tar.gz | tar -xz
+#            sudo mv ./s2i /usr/local/bin
+#      - run:
+#          name: kind_test_setup
+#          working_directory: ./testing/scripts
+#          command: ./kind_test_setup.sh
+#      - run:
+#          name: test_parallel
+#          working_directory: ./testing/scripts
+#          command: ./make test_parallel
       - run:
-          name: Install kind
+          name: integration
           command: |
-            curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.17.0/kind-linux-amd64
-            chmod +x kind
-            sudo mv kind /usr/local/bin/
-            echo "export KUBECONFIG='$(kind get kubeconfig-path)'" >> $BASH_ENV
-      - run:
-          name: Install kubectl
-          command: |
-            curl -LO https://dl.k8s.io/release/v1.25.3/bin/linux/amd64/kubectl
-            sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-      - run:
-          name: Install kustomize
-          command: |
-            URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
-            curl -L $URL | tar zx
-
-            [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
-            $SUDO chmod +x ./kustomize
-            $SUDO mv ./kustomize /usr/local/bin
-      - run:
-          name: Link python & install deps
-          command: |
-            sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
-            sudo apt update
-            sudo apt install -y python3-pip
-            pip install --user pytest grpcio-tools
-      - run:
-          name: Install s2i
-          command: |
-            curl -L https://github.com/openshift/source-to-image/releases/download/v1.3.2/source-to-image-v1.3.2-78363eee-linux-amd64.tar.gz | tar -xz
-            sudo mv ./s2i /usr/local/bin
-      - run:
-          name: kind_test_setup
-          working_directory: ./testing/scripts
-          command: ./kind_test_setup.sh
-      - run:
-          name: test_parallel
-          working_directory: ./testing/scripts
-          command: ./make test_parallel
+            cd testing/scripts
+            bash kind_test_all.sh
+          environment:
+            SELDON_E2E_TESTS_TO_RUN: base
+            SELDON_E2E_TESTS_POD_INFORMATION: true
+            GOMAXPROCS: "3"
 
 
 workflows:
