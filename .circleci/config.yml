@@ -87,13 +87,15 @@ jobs:
           command: ./test/seldon/setup/uninstall-all
 
   integration-test:
-    machine:
-      image: ubuntu-2204:current
+#    machine:
+#      image: ubuntu-2204:current
+    docker:
+      - image: cimg/base:2023.02
     resource_class: large
     steps:
-#      - setup_remote_docker:
-#          version: 20.10.18
-#          docker_layer_caching: true
+      - setup_remote_docker:
+          version: 20.10.18
+          docker_layer_caching: true
       - checkout
       - run:
           name: Docker login
