@@ -152,6 +152,8 @@ jobs:
             docker run \
                 --mount type=bind,source="$(pwd)",target=/work \
                 --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+                --mount type=bind,source=/sys/fs/cgroup,target=/sys/fs/cgroup \
+                --mount type=bind,source=/lib/modules,target=/lib/modules,readonly \
                 --env SELDON_E2E_TESTS_TO_RUN=base \
                 --env SELDON_E2E_TESTS_POD_INFORMATION=true \
                 --env GOMAXPROCS="4" \
