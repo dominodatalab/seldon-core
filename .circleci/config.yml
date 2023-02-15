@@ -87,23 +87,27 @@ jobs:
           command: ./test/seldon/setup/uninstall-all
 
   integration-test:
-#    machine:
+    machine:
 #      image: seldonio/core-builder:0.27
-#      image: ubuntu-2204:current
-    docker:
-      - image: seldonio/core-builder:0.27
+      image: ubuntu-2204:current
+      docker_layer_caching: true
+#    docker:
+#      - image: seldonio/core-builder:0.27
 #      - image: cimg/base:2023.02
     resource_class: large
     steps:
-      - setup_remote_docker:
-          version: 20.10.18
-          docker_layer_caching: true
+#      - setup_remote_docker:
+#          version: 20.10.18
+#          docker_layer_caching: true
       - checkout
 #      - go/install:
 #          version: "1.17"
       - run:
           name: Docker login
           command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+      - run:
+          name: Docker pull
+          command: docker pull seldonio/core-builder:0.27
 #      - run:
 #          name: Install kind
 #          command: |
@@ -148,12 +152,15 @@ jobs:
       - run:
           name: integration
           command: |
-            cd testing/scripts
-            bash kind_test_all.sh
+            docker run \
+                --mount type=bind,source="$(pwd)",target=/work \
+                --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+                --env SELDON_E2E_TESTS_TO_RUN=base \
+                --env SELDON_E2E_TESTS_POD_INFORMATION=true \
+                --env GOMAXPROCS="2" \
+                seldonio/core-builder:0.27 \
+                bash -c "cd testing/scripts && bash kind_test_all.sh"
           environment:
-            SELDON_E2E_TESTS_TO_RUN: base
-            SELDON_E2E_TESTS_POD_INFORMATION: true
-            GOMAXPROCS: "2"
 
 
 workflows:
