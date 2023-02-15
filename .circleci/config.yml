@@ -90,7 +90,7 @@ jobs:
     machine:
 #      image: seldonio/core-builder:0.27
       image: ubuntu-2204:current
-      docker_layer_caching: true
+#      docker_layer_caching: true
 #    docker:
 #      - image: seldonio/core-builder:0.27
 #      - image: cimg/base:2023.02
