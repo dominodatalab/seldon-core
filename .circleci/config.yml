@@ -159,7 +159,6 @@ jobs:
                 --env GOMAXPROCS="4" \
                 seldonio/core-builder:0.27 \
                 bash -c "docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD} && cd testing/scripts && bash kind_test_all.sh"
-          environment:
 
 
 workflows:
