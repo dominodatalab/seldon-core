@@ -8,6 +8,9 @@ parameters:
   kustomize-version:
     type: string
     default: v4.5.7
+  docker-registry:
+    type: string
+    default: quay.io
 
 jobs:
   build-and-push:
@@ -32,7 +35,7 @@ jobs:
       - checkout
       - run:
           name: "Docker login"
-          command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+          command: docker login << pipeline.parameters.docker-registry >> -u ${QUAY_USER} -p ${QUAY_PASSWORD}
       - run:
           name: "Seldon-core Domino Build & Push Script"
           command: ./domino-build.sh
@@ -104,7 +107,7 @@ jobs:
 #          version: "1.17"
       - run:
           name: Docker login
-          command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+          command: docker login << pipeline.parameters.docker-registry >> -u ${QUAY_USER} -p ${QUAY_PASSWORD}
 #      - run:
 #          name: Install kind
 #          command: |
@@ -158,7 +161,7 @@ jobs:
                 --env SELDON_E2E_TESTS_POD_INFORMATION=true \
                 --env GOMAXPROCS="4" \
                 seldonio/core-builder:0.27 \
-                bash -c "docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD} && cd testing/scripts && bash kind_test_all.sh"
+                bash -c "docker login << pipeline.parameters.docker-registry >> -u ${QUAY_USER} -p ${QUAY_PASSWORD} && cd testing/scripts && bash kind_test_all.sh"
 
 
 workflows:
@@ -181,7 +184,7 @@ workflows:
 #              only: /v\d+(\.\d+)*(-.*)*/
       - integration-test:
           context:
-            - org-global
+            - Quay Updater
 #          requires:
 #            - build-and-push
           filters:
