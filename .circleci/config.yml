@@ -161,7 +161,6 @@ jobs:
                 bash -c "docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD} && cd testing/scripts && bash kind_test_all.sh"
 
 
-
 workflows:
   version: 2
   main:
