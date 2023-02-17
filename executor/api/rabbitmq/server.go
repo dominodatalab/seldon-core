@@ -4,19 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/golang/protobuf/jsonpb"
 	guuid "github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seldonio/seldon-core/executor/api/grpc/seldon/proto"
 	"github.com/seldonio/seldon-core/executor/k8s"
+	"github.com/wagslane/go-rabbitmq"
 
 	"github.com/go-logr/logr"
 	"github.com/seldonio/seldon-core/executor/api"
@@ -121,29 +123,61 @@ func CreateRabbitMQServer(args RabbitMQServerOptions) (*SeldonRabbitMQServer, er
 }
 
 func (rs *SeldonRabbitMQServer) Serve() error {
-	conn, err := NewConnection(rs.BrokerUrl, rs.Log.WithName("RabbitMQServerConnection"))
+	conn, err := createRabbitMQConnection(rs.BrokerUrl, rs.Log)
 	if err != nil {
 		rs.Log.Error(err, "error connecting to rabbitmq")
 		return fmt.Errorf("error '%w' connecting to rabbitmq", err)
 	}
+	defer func(conn ConnectionWrapper) {
+		err := conn.Close()
+		if err != nil {
+			rs.Log.Error(err, "error closing rabbitMQ connection")
+		}
+	}(conn)
 
-	go func() {
-		err := <-conn.err
-		log.Fatal("RabbitMQ connection died", err) // causes app to exit with error
-	}()
-
-	return rs.serve(conn)
-}
-
-func (rs *SeldonRabbitMQServer) serve(conn *connection) error {
-	//TODO not sure if this is the best pattern or better to pass in pod name explicitly somehow
-	consumerTag, err := os.Hostname()
+	wg := new(sync.WaitGroup)
+	terminateChan, err := rs.serve(conn, wg)
 	if err != nil {
-		return fmt.Errorf("error '%w' retrieving hostname", err)
+		rs.Log.Error(err, "error starting rabbitmq server")
+		return fmt.Errorf("error '%w' starting rabbitmq server", err)
 	}
 
-	consumer := &consumer{*conn, rs.InputQueueName, consumerTag}
-	rs.Log.Info("Created", "consumer", consumer, "input queue", rs.InputQueueName)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	wg.Add(1)
+	// wait for shutdown signal and terminate if received
+	go func() {
+		rs.Log.Info("awaiting OS shutdown signals")
+		sig := <-sigs
+		rs.Log.Info("sending termination message due to signal", "signal", sig)
+		terminateChan <- true
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	rs.Log.Info("RabbitMQ server terminated normally")
+	return nil
+}
+
+func (rs *SeldonRabbitMQServer) serve(conn ConnectionWrapper, wg *sync.WaitGroup) (chan<- bool, error) {
+	// not sure if this is the best pattern or better to pass in pod name explicitly somehow
+	consumerTag, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("error '%w' retrieving hostname", err)
+	}
+
+	publisher, err := conn.NewPublisher()
+	if err != nil {
+		return nil, fmt.Errorf("error '%w' creating RMQ publisher", err)
+	}
+	rs.Log.Info("Created", "publisher", publisher)
+
+	consumerHandler := CreateConsumerHandler(
+		func(reqPl *SeldonPayloadWithHeaders) error { return rs.predictAndPublishResponse(reqPl, publisher) },
+		func(args ConsumerError) error { return rs.createAndPublishErrorResponse(args, publisher) },
+		rs.Log,
+	)
 
 	// wait for graph to be ready
 	ready := false
@@ -156,25 +190,31 @@ func (rs *SeldonRabbitMQServer) serve(conn *connection) error {
 		}
 	}
 
-	producer := &publisher{*conn, rs.OutputQueueName}
-
-	// consumer creates input queue if it doesn't exist
-	err = consumer.Consume(
-		func(reqPl *SeldonPayloadWithHeaders) error { return rs.predictAndPublishResponse(reqPl, producer) },
-		func(args ConsumerError) error { return rs.createAndPublishErrorResponse(args, producer) },
-	)
+	consumer, err := conn.NewConsumer(consumerHandler, rs.InputQueueName, consumerTag)
 	if err != nil {
-		rs.Log.Error(err, "error in consumer")
-		return fmt.Errorf("error '%w' in consumer", err)
+		return nil, fmt.Errorf("error '%w' creating RMQ consumer", err)
 	}
+	rs.Log.Info("Created", "consumer", consumer, "input queue", rs.InputQueueName)
 
-	rs.Log.Info("Consumer exited without error")
-	return nil
+	// provide a channel to terminate the server
+	terminate := make(chan bool, 1)
+
+	wg.Add(1)
+	go func() {
+		rs.Log.Info("awaiting group termination")
+		<-terminate
+		rs.Log.Info("termination initiated, shutting down")
+		consumer.Close()
+		publisher.Close()
+		wg.Done()
+	}()
+
+	return terminate, nil
 }
 
 func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	reqPayload *SeldonPayloadWithHeaders,
-	publisher *publisher,
+	publisher PublisherWrapper,
 ) error {
 	if reqPayload == nil {
 		err := errors.New("missing request payload")
@@ -243,10 +283,10 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		rs.Log.Error(err, UNHANDLED_ERROR)
 		return fmt.Errorf("unhandled error %w from predictor process", err)
 	}
-	return publishPayload(publisher, updatedPayload, seldonPuid)
+	return rs.publishPayload(publisher, updatedPayload, seldonPuid)
 }
 
-func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs ConsumerError, publisher *publisher) error {
+func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs ConsumerError, publisher PublisherWrapper) error {
 	reqPayload := errorArgs.pl
 
 	seldonPuid := assignAndReturnPUID(reqPayload, &errorArgs.delivery)
@@ -285,10 +325,22 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 		break
 	}
 
-	return publishPayload(publisher, resPayload, seldonPuid)
+	return rs.publishPayload(publisher, resPayload, seldonPuid)
 }
 
-func assignAndReturnPUID(pl *SeldonPayloadWithHeaders, delivery *amqp.Delivery) string {
+func (rs *SeldonRabbitMQServer) publishPayload(publisher PublisherWrapper, pl payload.SeldonPayload, seldonPuid string) error {
+	resHeaders := map[string][]string{payload.SeldonPUIDHeader: {seldonPuid}}
+	//TODO might need more headers
+
+	resPayloadWithHeaders := SeldonPayloadWithHeaders{
+		pl,
+		resHeaders,
+	}
+
+	return DoPublish(publisher, resPayloadWithHeaders, rs.OutputQueueName, rs.Log)
+}
+
+func assignAndReturnPUID(pl *SeldonPayloadWithHeaders, delivery *rabbitmq.Delivery) string {
 	if pl == nil {
 		if delivery != nil && delivery.Headers != nil && delivery.Headers[payload.SeldonPUIDHeader] != nil {
 			return delivery.Headers[payload.SeldonPUIDHeader].(string)
@@ -302,16 +354,4 @@ func assignAndReturnPUID(pl *SeldonPayloadWithHeaders, delivery *amqp.Delivery) 
 		pl.Headers[payload.SeldonPUIDHeader] = []string{guuid.New().String()}
 	}
 	return pl.Headers[payload.SeldonPUIDHeader][0]
-}
-
-func publishPayload(publisher *publisher, pl payload.SeldonPayload, seldonPuid string) error {
-	resHeaders := map[string][]string{payload.SeldonPUIDHeader: {seldonPuid}}
-	//TODO might need more headers
-
-	resPayloadWithHeaders := SeldonPayloadWithHeaders{
-		pl,
-		resHeaders,
-	}
-
-	return publisher.Publish(resPayloadWithHeaders)
 }
