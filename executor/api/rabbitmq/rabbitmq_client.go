@@ -22,6 +22,7 @@ type RabbitMqConsumer struct {
 
 type RabbitMqPublisher struct {
 	rabbitmq.Publisher
+	log logr.Logger
 }
 
 func createRabbitMQConnection(brokerUrl string, log logr.Logger) (ConnectionWrapper, error) {
@@ -47,7 +48,7 @@ func (c *RabbitMqConnection) NewPublisher() (PublisherWrapper, error) {
 		c.log.Error(err, "error creating publisher")
 		return nil, fmt.Errorf("error '%w' creating publisher", err)
 	}
-	return &RabbitMqPublisher{*publisher}, nil
+	return &RabbitMqPublisher{*publisher, c.log}, nil
 }
 
 func (c *RabbitMqConnection) NewConsumer(handler rabbitmq.Handler, queue string, consumerTag string) (ConsumerWrapper, error) {
@@ -74,28 +75,19 @@ func (p *RabbitMqPublisher) Close() {
 }
 
 func (p *RabbitMqPublisher) Publish(
-	data []byte,
-	routingKeys []string,
-	optionFuncs ...func(*rabbitmq.PublishOptions),
-) error {
-	return p.Publisher.Publish(data, routingKeys, optionFuncs...)
-}
-
-func DoPublish(
-	publisher PublisherWrapper,
-	payload SeldonPayloadWithHeaders,
+	payloadWithHeaders SeldonPayloadWithHeaders,
 	queueName string,
-	log logr.Logger,
 ) error {
 
+	payload := payloadWithHeaders.Payload
 	body, err := payload.GetBytes()
 	if err != nil {
-		log.Error(err, "error retrieving payload bytes")
+		p.log.Error(err, "error retrieving payload bytes")
 		return fmt.Errorf("error '%w' retrieving payload bytes", err)
 	}
 
 	options := []func(options *rabbitmq.PublishOptions){
-		rabbitmq.WithPublishOptionsHeaders(StringMapToTable(payload.Headers)),
+		rabbitmq.WithPublishOptionsHeaders(StringMapToTable(payloadWithHeaders.Headers)),
 		rabbitmq.WithPublishOptionsContentType(payload.GetContentType()),
 		rabbitmq.WithPublishOptionsContentEncoding(""),
 		rabbitmq.WithPublishOptionsPersistentDelivery,
@@ -107,13 +99,13 @@ func DoPublish(
 		options = append(options, rabbitmq.WithPublishOptionsImmediate)
 	}
 
-	err = publisher.Publish(
+	err = p.Publisher.Publish(
 		body,
 		[]string{queueName},
 		options...,
 	)
 	if err != nil {
-		log.Error(err, "error publishing rabbitmq message")
+		p.log.Error(err, "error publishing rabbitmq message")
 		return fmt.Errorf("error '%w' publishing rabbitmq message", err)
 	}
 

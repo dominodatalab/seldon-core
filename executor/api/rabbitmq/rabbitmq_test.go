@@ -55,11 +55,10 @@ func (m *MockPublisherWrapper) Close() {
 }
 
 func (m *MockPublisherWrapper) Publish(
-	data []byte,
-	routingKeys []string,
-	optionFuncs ...func(*rabbitmq.PublishOptions),
+	payload SeldonPayloadWithHeaders,
+	queueName string,
 ) error {
-	returnArgs := m.Called(data, routingKeys, optionFuncs)
+	returnArgs := m.Called(payload, queueName)
 	return returnArgs.Error(0)
 }
 

@@ -238,7 +238,7 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 	seldonPredictorProcess := pred.NewPredictorProcess(
 		ctx, rs.Client, rs.Log.WithName("RabbitMqClient"), &rs.ServerUrl, rs.Namespace, reqPayload.Headers, "")
 
-	resPayload, err := seldonPredictorProcess.Predict(&rs.Predictor.Graph, reqPayload)
+	resPayload, err := seldonPredictorProcess.Predict(&rs.Predictor.Graph, reqPayload.Payload)
 	if err != nil && resPayload == nil {
 		// normal errors from the predict process contain a status failed payload
 		// this is handling an unexpected case, so failing entirely, at least for now
@@ -278,7 +278,7 @@ func (rs *SeldonRabbitMQServer) predictAndPublishResponse(
 		}
 	}
 
-	updatedPayload, err := UpdatePayloadWithPuid(reqPayload, resPayload)
+	updatedPayload, err := UpdatePayloadWithPuid(reqPayload.Payload, resPayload)
 	if err != nil {
 		rs.Log.Error(err, UNHANDLED_ERROR)
 		return fmt.Errorf("unhandled error %w from predictor process", err)
@@ -328,16 +328,17 @@ func (rs *SeldonRabbitMQServer) createAndPublishErrorResponse(errorArgs Consumer
 	return rs.publishPayload(publisher, resPayload, seldonPuid)
 }
 
-func (rs *SeldonRabbitMQServer) publishPayload(publisher PublisherWrapper, pl payload.SeldonPayload, seldonPuid string) error {
+func addPuidHeader(pl payload.SeldonPayload, seldonPuid string) SeldonPayloadWithHeaders {
 	resHeaders := map[string][]string{payload.SeldonPUIDHeader: {seldonPuid}}
-	//TODO might need more headers
-
-	resPayloadWithHeaders := SeldonPayloadWithHeaders{
+	return SeldonPayloadWithHeaders{
 		pl,
 		resHeaders,
 	}
+}
 
-	return DoPublish(publisher, resPayloadWithHeaders, rs.OutputQueueName, rs.Log)
+func (rs *SeldonRabbitMQServer) publishPayload(publisher PublisherWrapper, pl payload.SeldonPayload, seldonPuid string) error {
+	plWithHeaders := addPuidHeader(pl, seldonPuid)
+	return publisher.Publish(plWithHeaders, rs.OutputQueueName)
 }
 
 func assignAndReturnPUID(pl *SeldonPayloadWithHeaders, delivery *rabbitmq.Delivery) string {

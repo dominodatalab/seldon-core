@@ -21,9 +21,8 @@ type ConsumerWrapper interface {
 type PublisherWrapper interface {
 	Close()
 	Publish(
-		data []byte,
-		routingKeys []string,
-		optionFuncs ...func(*rabbitmq.PublishOptions),
+		payload SeldonPayloadWithHeaders,
+		queueName string,
 	) error
 }
 
@@ -34,6 +33,6 @@ type ConsumerError struct {
 }
 
 type SeldonPayloadWithHeaders struct {
-	payload.SeldonPayload
+	Payload payload.SeldonPayload
 	Headers map[string][]string
 }

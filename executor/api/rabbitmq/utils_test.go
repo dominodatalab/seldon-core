@@ -75,17 +75,17 @@ func TestDeliveryToPayload(t *testing.T) {
 		pl, err := DeliveryToPayload(testDeliveryProto)
 
 		assert.NoError(t, err)
-		assert.Equal(t, protoMessage, pl.GetPayload())
+		assert.Equal(t, protoMessage, pl.Payload.GetPayload())
 	})
 
 	t.Run("rest payload", func(t *testing.T) {
 		pl, err := DeliveryToPayload(testDeliveryRest)
 
 		assert.NoError(t, err)
-		assert.Equal(t, bytesBody, pl.GetPayload())
+		assert.Equal(t, bytesBody, pl.Payload.GetPayload())
 
 		body := &proto.SeldonMessage{}
-		err = jsonpb.UnmarshalString(string(pl.GetPayload().([]byte)), body)
+		err = jsonpb.UnmarshalString(string(pl.Payload.GetPayload().([]byte)), body)
 
 		assert.NoError(t, err)
 		assert.Equal(t, protoMessage, body)
