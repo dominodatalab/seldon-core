@@ -9505,9 +9505,9 @@ SOFTWARE.
 
 
 --------------------------------------------------------------------------------
-go-redis/redis  BSD 2-Clause "Simplified" License  https://github.com/go-redis/redis/blob/master/LICENSE
+go-redis/redis  BSD 2-Clause "Simplified" License  https://github.com/redis/go-redis/blob/master/LICENSE
 --------------------------------------------------------------------------------
-Copyright (c) 2013 The github.com/go-redis/redis Authors.
+Copyright (c) 2013 The github.com/redis/go-redis Authors.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -14208,6 +14208,8 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 --------------------------------------------------------------------------------
 hashicorp/errwrap  Mozilla Public License 2.0  https://github.com/hashicorp/errwrap/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2014 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -14566,6 +14568,8 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 --------------------------------------------------------------------------------
 hashicorp/go-cleanhttp  Mozilla Public License 2.0  https://github.com/hashicorp/go-cleanhttp/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2015 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -14933,9 +14937,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 --------------------------------------------------------------------------------
 hashicorp/go-hclog  MIT License  https://github.com/hashicorp/go-hclog/blob/main/LICENSE
 --------------------------------------------------------------------------------
-MIT License
-
-Copyright (c) 2017 HashiCorp
+Copyright (c) 2017 HashiCorp, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -14958,6 +14960,8 @@ SOFTWARE.
 --------------------------------------------------------------------------------
 hashicorp/go-immutable-radix  Mozilla Public License 2.0  https://github.com/hashicorp/go-immutable-radix/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2015 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -15351,6 +15355,8 @@ SOFTWARE.
 --------------------------------------------------------------------------------
 hashicorp/go-multierror  Mozilla Public License 2.0  https://github.com/hashicorp/go-multierror/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2014 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -15706,7 +15712,7 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
       the Mozilla Public License, v. 2.0.
 
 --------------------------------------------------------------------------------
-hashicorp/go-plugin  Mozilla Public License 2.0  https://github.com/hashicorp/go-plugin/blob/master/LICENSE
+hashicorp/go-plugin  Mozilla Public License 2.0  https://github.com/hashicorp/go-plugin/blob/main/LICENSE
 --------------------------------------------------------------------------------
 Copyright (c) 2016 HashiCorp, Inc.
 
@@ -16067,6 +16073,8 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 --------------------------------------------------------------------------------
 hashicorp/go-retryablehttp  Mozilla Public License 2.0  https://github.com/hashicorp/go-retryablehttp/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2015 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -16434,6 +16442,8 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 --------------------------------------------------------------------------------
 hashicorp/go-rootcerts  Mozilla Public License 2.0  https://github.com/hashicorp/go-rootcerts/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2016 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -16801,6 +16811,8 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 --------------------------------------------------------------------------------
 hashicorp/go-secure-stdlib  Mozilla Public License 2.0  https://github.com/hashicorp/go-secure-stdlib/blob/main/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2020 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -19056,6 +19068,8 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 --------------------------------------------------------------------------------
 hashicorp/logutils  Mozilla Public License 2.0  https://github.com/hashicorp/logutils/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2013 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -19436,6 +19450,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --------------------------------------------------------------------------------
 hashicorp/memberlist  Mozilla Public License 2.0  https://github.com/hashicorp/memberlist/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2013 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -19794,6 +19810,8 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 --------------------------------------------------------------------------------
 hashicorp/serf  Mozilla Public License 2.0  https://github.com/hashicorp/serf/blob/master/LICENSE
 --------------------------------------------------------------------------------
+Copyright (c) 2013 HashiCorp, Inc.
+
 Mozilla Public License, version 2.0
 
 1. Definitions
@@ -29972,6 +29990,35 @@ prometheus/tsdb  Apache License 2.0  https://github.com/prometheus-junkyard/tsdb
    limitations under the License.
 
 --------------------------------------------------------------------------------
+rabbitmq/amqp091-go  BSD-2-Clause  https://github.com/rabbitmq/amqp091-go/blob/main/LICENSE
+--------------------------------------------------------------------------------
+AMQP 0-9-1 Go Client
+Copyright (c) 2021 VMware, Inc. or its affiliates. All Rights Reserved.
+
+Copyright (c) 2012-2021, Sean Treadway, SoundCloud Ltd.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this
+list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
 rcrowley/go-metrics  BSD 2-Clause "Simplified" License  https://github.com/rcrowley/go-metrics/blob/master/LICENSE
 --------------------------------------------------------------------------------
 Copyright 2012 Richard Crowley. All rights reserved.
@@ -32030,6 +32077,31 @@ wagslane/go-password-validator  MIT License  https://github.com/wagslane/go-pass
 MIT License
 
 Copyright (c) 2020 Lane Wagner
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+wagslane/go-rabbitmq  MIT License  https://github.com/wagslane/go-rabbitmq/blob/main/LICENSE
+--------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2021 Lane Wagner
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

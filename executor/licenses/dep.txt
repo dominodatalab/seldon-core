@@ -298,6 +298,7 @@ github.com/prometheus/common
 github.com/prometheus/procfs
 github.com/prometheus/statsd_exporter
 github.com/prometheus/tsdb
+github.com/rabbitmq/amqp091-go
 github.com/rcrowley/go-metrics
 github.com/robfig/cron/v3
 github.com/rogpeppe/fastuuid
@@ -337,6 +338,7 @@ github.com/ulikunitz/unixtime
 github.com/valyala/bytebufferpool
 github.com/valyala/fasthttp
 github.com/wagslane/go-password-validator
+github.com/wagslane/go-rabbitmq
 github.com/xdg-go/pbkdf2
 github.com/xdg-go/scram
 github.com/xdg-go/stringprep
