@@ -90,18 +90,18 @@ jobs:
           command: ./test/seldon/setup/uninstall-all
 
   integration-test:
-    machine:
+#    machine:
 #      image: seldonio/core-builder:0.27
-      image: ubuntu-2204:current
+#      image: ubuntu-2204:current
 #      docker_layer_caching: true
-#    docker:
-#      - image: seldonio/core-builder:0.27
+    docker:
+      - image: seldonio/core-builder:0.27
 #      - image: cimg/base:2023.02
     resource_class: large
     steps:
-#      - setup_remote_docker:
-#          version: 20.10.18
-#          docker_layer_caching: true
+      - setup_remote_docker:
+          version: 20.10.18
+          docker_layer_caching: true
       - checkout
 #      - go/install:
 #          version: "1.17"
@@ -152,16 +152,25 @@ jobs:
       - run:
           name: integration
           command: |
-            docker run \
-                --mount type=bind,source="$(pwd)",target=/work \
-                --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-                --mount type=bind,source=/sys/fs/cgroup,target=/sys/fs/cgroup \
-                --mount type=bind,source=/lib/modules,target=/lib/modules,readonly \
-                --env SELDON_E2E_TESTS_TO_RUN=base \
-                --env SELDON_E2E_TESTS_POD_INFORMATION=true \
-                --env GOMAXPROCS="4" \
-                seldonio/core-builder:0.27 \
-                bash -c "docker login << pipeline.parameters.docker-registry >> -u ${QUAY_USER} -p ${QUAY_PASSWORD} && cd testing/scripts && bash kind_test_all.sh"
+            cd testing/scripts 
+            bash kind_test_all.sh
+          environment:
+            SELDON_E2E_TESTS_TO_RUN: "base"
+            SELDON_E2E_TESTS_POD_INFORMATION: "true"
+            GOMAXPROCS: 2
+#      - run:
+#          name: integration
+#          command: |
+#            docker run \
+#                --mount type=bind,source="$(pwd)",target=/work \
+#                --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+#                --mount type=bind,source=/sys/fs/cgroup,target=/sys/fs/cgroup \
+#                --mount type=bind,source=/lib/modules,target=/lib/modules,readonly \
+#                --env SELDON_E2E_TESTS_TO_RUN=base \
+#                --env SELDON_E2E_TESTS_POD_INFORMATION=true \
+#                --env GOMAXPROCS="4" \
+#                seldonio/core-builder:0.27 \
+#              bash -c "docker login << pipeline.parameters.docker-registry >> -u ${QUAY_USER} -p ${QUAY_PASSWORD} && cd testing/scripts && bash kind_test_all.sh"
 
 
 workflows:
