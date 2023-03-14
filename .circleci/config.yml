@@ -3,6 +3,7 @@ version: 2.1
 orbs:
   go: circleci/go@1.7.1
   helm: circleci/helm@2.0.1
+  repo-standards: dominodatalab/repo-standards@0.1
 
 parameters:
   kustomize-version:
@@ -10,36 +11,6 @@ parameters:
     default: v4.5.7
 
 jobs:
-  build-and-push:
-    docker:
-     - image: cimg/base:2022.08
-    resource_class: medium
-    steps:
-      - go/install:
-          version: "1.17"
-      - run:
-          name: "Install kustomize"
-          command: |
-            URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
-            curl -L $URL | tar zx
-
-            [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
-            $SUDO chmod +x ./kustomize
-            $SUDO mv ./kustomize /usr/local/bin
-      - setup_remote_docker:
-          version: 20.10.14
-      - checkout
-      - run:
-          name: "Docker login"
-          command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
-      - run:
-          name: "Seldon-core Domino Build & Push Script"
-          command: ./domino-build.sh
-      - persist_to_workspace:
-          root: ~/
-          paths:
-            - ./*
-
   test:
     machine:
       image: ubuntu-2004:current
@@ -89,17 +60,82 @@ workflows:
   version: 2
   main:
     jobs:
-      - build-and-push:
+      - repo-standards/package-docker:
+          name: seldon-core-operator_image_build_and_push
+          image_dockerfile: "operator/Dockerfile"
+          image_name: "domino/seldon-core-operator"
+          base_branch: "rabbitmq"
           context:
-            - org-global
+            - repo-standards-docker-login-readwrite
           filters:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
+          pre-steps:
+            - go/install:
+                version: "1.17"
+            - run:
+                name: "Install kustomize"
+                command: |
+                  URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
+                  curl -L $URL | tar zx
+
+                  [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
+                  $SUDO chmod +x ./kustomize
+                  $SUDO mv ./kustomize /usr/local/bin
+            - checkout
+            - run:
+                name: "Generate resources for image"
+                working_directory: operator
+                command: |
+                  make generate-resources 
+          post-steps:
+            - run:
+                name: "Get operator Docker image tag for downstream tests"
+                command: |
+                  dtag="$(cat ci_artifacts/image_name | sed 's/.*://')"
+                  echo "Saving Docker image tag to file: ${dtag}"
+                  echo "${dtag}" > ~/.seldon-core-image-tag
+            
+            - persist_to_workspace:
+                root: ~/
+                paths:
+                  - .seldon-core-image-tag
+      
+      - repo-standards/package-docker:
+          name: seldon-core-executor_image_build_and_push
+          image_dockerfile: "executor/Dockerfile.executor"
+          image_name: "domino/seldon-core-executor"
+          base_branch: "rabbitmq"
+          context:
+            - repo-standards-docker-login-readwrite
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
+          pre-steps:
+            - go/install:
+                version: "1.17"
+            - run:
+                name: "Install kustomize"
+                command: |
+                  URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/<< pipeline.parameters.kustomize-version >>/kustomize_<< pipeline.parameters.kustomize-version >>_linux_amd64.tar.gz
+                  curl -L $URL | tar zx
+
+                  [ -w /usr/local/bin ] && SUDO="" || SUDO=sudo
+                  $SUDO chmod +x ./kustomize
+                  $SUDO mv ./kustomize /usr/local/bin
+            - checkout
+            - run:
+                name: "Generate resources for image"
+                working_directory: executor
+                command: |
+                  make test copy_openapi_resources 
+
       - test:
           context:
             - org-global
           requires:
-            - build-and-push
+            - seldon-core-operator_image_build_and_push
+            - seldon-core-executor_image_build_and_push
           filters:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
