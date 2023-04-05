@@ -69,9 +69,9 @@ workflows:
             - repo-standards-docker-login-readwrite
           filters:
             branches:
-              ignore: /^release(s)?-\d*\.\d*\.\d*$/
+              ignore: /^release(s)?-\d+\.\d+\.\d+$/
             tags:
-              only: /^v\d*\.\d*\.\d*(-\d*)?$/
+              only: /^v\d+\.\d+\.\d+(-\S+)?/
           pre-steps:
             - go/install:
                 version: "1.17"
@@ -112,9 +112,9 @@ workflows:
             - repo-standards-docker-login-readwrite
           filters:
             branches:
-              ignore: /^release(s)?-\d*\.\d*\.\d*$/
+              ignore: /^release(s)?-\d+\.\d+\.\d+$/
             tags:
-              only: /^v\d*\.\d*\.\d*(-\d*)?$/
+              only: /^v\d+\.\d+\.\d+(-\S+)?/
           pre-steps:
             - go/install:
                 version: "1.17"
@@ -142,6 +142,6 @@ workflows:
             - seldon-core-executor_image_build_and_push
           filters:
             branches:
-              ignore: /^release(s)?-\d*\.\d*\.\d*$/
+              ignore: /^release(s)?-\d+\.\d+\.\d+$/
             tags:
-              only: /^v\d*\.\d*\.\d*(-\d*)?$/
+              only: /^v\d+\.\d+\.\d+(-\S+)?/
