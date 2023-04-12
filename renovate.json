@@ -22,7 +22,8 @@
       ],
       "matchPackagePatterns": [
         "quay.io/domino/*"
-      ]
+      ],
+      "versioning": "loose"
     }
   ]
 }
