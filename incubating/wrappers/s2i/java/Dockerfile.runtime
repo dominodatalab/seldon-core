@@ -1,4 +1,4 @@
-ARG IMAGE_SOURCE=openjdk:13.0.1-jdk-buster
+ARG IMAGE_SOURCE=openjdk:13.0.2-jdk-buster
 FROM $IMAGE_SOURCE
 
 RUN apt-get upgrade && \
