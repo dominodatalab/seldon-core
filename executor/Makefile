@@ -11,6 +11,15 @@ EXECUTOR_FOLDERS ?= ./api/... ./predictor/... ./k8s/... ./logger/...
 
 KIND_NAME ?= kind
 
+# For labeling the operator Docker image(s)
+GITHUB_TEAM := "dominodatalab/seldon-core-maintainers"
+BUILD_DATE := $(shell date -uIseconds)
+IMAGE_BASE_DOCKERFILE := "https://github.com/dominodatalab/seldon-core/blob/rabbitmq/executor/Dockerfile.executor"
+
+# These should be set in CI, but in case we are running locally, let's set some default values
+CIRCLE_SHA1 ?= $(shell git rev-parse HEAD)
+CIRCLE_BUILD_URL ?= "local"
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -85,13 +94,23 @@ test: copy_operator fmt vet
 	go test ${EXECUTOR_FOLDERS} -coverprofile cover.out
 
 copy_openapi_resources:
-	mkdir -p api/rest/openapi/
-	cp ../openapi/swagger-ui/* api/rest/openapi/
+	mkdir -p api/rest/openapi
+	cp ../openapi/swagger-ui/* api/rest/openapi
 	cp ../openapi/engine.oas3.json api/rest/openapi/seldon.json
+	mkdir -p api/rest/openapi/open-inference
+	cp ../openapi/v2/swagger-ui/* api/rest/openapi/open-inference
+	cp ../openapi/v2/dataplane.yaml api/rest/openapi/open-inference/dataplane.yaml
 
 # Build the docker image
 docker-build: test copy_openapi_resources
-	docker build -f Dockerfile.executor -t ${IMG} .
+	docker build . \
+		-f Dockerfile.executor \
+		-t ${IMG} \
+		--label "org.opencontainers.image.authors=github_team:${GITHUB_TEAM}" \
+		--label "org.opencontainers.image.revision=${CIRCLE_SHA1}" \
+		--label "com.dominodatalab.image.osrp.datetime=${BUILD_DATE}" \
+		--label "com.dominodatalab.image.dockerfile=${IMAGE_BASE_DOCKERFILE}" \
+		--label "com.dominodatalab.ci.build-url=${CIRCLE_BUILD_URL}"
 
 # Build the docker image for Redhat
 docker-build-redhat: test copy_openapi_resources
@@ -133,7 +152,7 @@ clean:
 install-dev:
 	# Tool to generate license info
 	pip install \
-		'git+https://github.com/kubeflow/testing#egg=go-license-tools&subdirectory=py/kubeflow/testing/go-license-tools'
+		'git+https://github.com/seldonio/kubeflow-testing#egg=go-license-tools&subdirectory=py/kubeflow/testing/go-license-tools'
 
 
 .PHONY: licenses/dep.txt
@@ -146,12 +165,12 @@ licenses: licenses/dep.txt
 	# NOTE: You need to create a file in ~/.github_api_token with a GitHub token.
 	get-github-repo \
 		-o licenses/repo.txt \
-		--manual-dep-repo-mapping licenses/dep_repo.manual.csv \
+		--manual-dep-repo-mapping ../licenses/dep_repo.manual.csv \
 		licenses/dep.txt
 	get-github-license-info -o licenses/license_info.csv licenses/repo.txt
 	python -m 'patch_additional_license_info' \
 		licenses/license_info.csv \
-		licenses/additional_license_info.csv
+		../licenses/additional_license_info.csv
 	concatenate-license -o licenses/license.txt licenses/license_info.csv
 
 

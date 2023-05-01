@@ -1,5 +1,6 @@
 seldonio/seldon-core
 None
+https://gotools.org/dmitri.shuralyov.com/gpu/mtl
 Azure/azure-amqp-common-go
 Azure/azure-event-hubs-go
 Azure/azure-kusto-go
@@ -31,8 +32,10 @@ apache/thrift
 armon/circbuf
 armon/go-metrics
 armon/go-radix
+armon/go-socks5
 asaskevich/govalidator
 aws/aws-sdk-go
+banzaicloud/k8s-objectmatcher
 benbjohnson/clock
 beorn7/perks
 bgentry/speakeasy
@@ -129,6 +132,7 @@ golang/snappy
 google/btree
 google/cel-go
 google/cel-spec
+google/gnostic
 google/go-cmp
 google/go-github
 google/go-querystring
@@ -314,7 +318,7 @@ xhit/go-str2duration
 xiang90/probing
 youmark/pkcs8
 yuin/goldmark
-gomodules/jsonpatch
+https://github.com/golang/go
 alecthomas/kingpin
 go-check/check
 go-errgo/errgo
@@ -325,5 +329,3 @@ go-resty/resty
 square/go-jose
 go-tomb/tomb
 go-yaml/yaml
-gotestyourself/gotest.tools
-dominikh/go-tools

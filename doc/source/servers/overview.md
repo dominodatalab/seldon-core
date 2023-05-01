@@ -23,7 +23,7 @@ spec:
       graph:
         name: classifier
         implementation: SKLEARN_SERVER
-        modelUri: gs://seldon-models/v1.15.0/sklearn/iris
+        modelUri: gs://seldon-models/v1.16.0/sklearn/iris
 ```
 
 By default only public models published to Google Cloud Storage will be accessible.
@@ -37,7 +37,7 @@ Seldon Core uses [Init Containers](https://kubernetes.io/docs/concepts/workloads
 
 ```yaml
 storageInitializer:
-  image: seldonio/rclone-storage-initializer:1.15.0
+  image: seldonio/rclone-storage-initializer:1.16.0
 ```
 in our default [helm values](../charts/seldon-core-operator.html#values).
 See the [Dockerfile](https://github.com/SeldonIO/seldon-core/blob/master/components/rclone-storage-initializer/Dockerfile
@@ -82,7 +82,7 @@ spec:
 
         initContainers:
         - name: classifier-model-initializer
-          image: seldonio/rclone-storage-initializer:1.15.0
+          image: seldonio/rclone-storage-initializer:1.16.0
           imagePullPolicy: IfNotPresent
           args:
             - "s3://sklearn/iris"
@@ -133,7 +133,7 @@ spec:
       name: classifier
       implementation: SKLEARN_SERVER
       modelUri: s3://sklearn/iris
-      storageInitializerImage: seldonio/rclone-storage-initializer:1.15.0  # Specify custom image here
+      storageInitializerImage: seldonio/rclone-storage-initializer:1.16.0  # Specify custom image here
       envSecretRefName: seldon-init-container-secret                          # Specify custom secret here
 ```
 Note that image and secret used by Storage Initializer can be customised per-deployment.
@@ -163,7 +163,7 @@ spec:
     graph:
       name: classifier
       implementation: SKLEARN_SERVER
-      modelUri: gs://seldon-models/v1.15.0/sklearn/iris
+      modelUri: gs://seldon-models/v1.16.0/sklearn/iris
 ```
 
 The image name and other details will be added when this is deployed automatically.
@@ -326,6 +326,24 @@ stringData:
 
 Note: remote name is `gcs` here so urls would take form similar to `gcs:<your bucket>`.
 Tip: using `cat gcloud-application-credentials.json | jq -c .` can help to easily collapse credentials.json into one line.
+
+### Example Azure Blob with Account Key
+
+Reference: [rclone documentation](https://rclone.org/azureblob/)
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: seldon-rclone-secret
+type: Opaque
+stringData:
+  RCLONE_CONFIG_AZUREBLOB_TYPE: azureblob
+  RCLONE_CONFIG_AZUREBLOB_ACCOUNT: ""
+  RCLONE_CONFIG_AZUREBLOB_ENV_AUTH: "false"
+  RCLONE_CONFIG_AZUREBLOB_KEY: ""
+```
+Note: remote name is `azureblob` here so urls would take form similar to `azureblob:<container>/path/to/dir`.
 
 ### Directly from PVC
 
