@@ -1,91 +1,65 @@
 package rabbitmq
 
 import (
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seldonio/seldon-core/executor/api/rest"
 	"github.com/stretchr/testify/mock"
+	"github.com/wagslane/go-rabbitmq"
 )
 
-/*
- * adapted from https://github.com/dominodatalab/forge/blob/master/internal/message/amqp/amqp_test.go
- */
-
-type mockDialerAdapter struct {
+type MockConnectionWrapper struct {
 	mock.Mock
 }
 
-func (m *mockDialerAdapter) Dial(url string) (Connection, error) {
-	args := m.Called(url)
-	amqpConn, _ := args.Get(0).(Connection)
-
-	return amqpConn, args.Error(1)
+func (m *MockConnectionWrapper) Close() error {
+	returnArgs := m.Called()
+	return returnArgs.Error(0)
 }
 
-type mockConnection struct {
+func (m *MockConnectionWrapper) NewPublisher() (PublisherWrapper, error) {
+	returnArgs := m.Called()
+	publisher := returnArgs.Get(0).(PublisherWrapper)
+	return publisher, returnArgs.Error(1)
+}
+
+func (m *MockConnectionWrapper) NewConsumer(handler rabbitmq.Handler, queue string, consumerTag string) (ConsumerWrapper, error) {
+	returnArgs := m.Called(handler, inputQueue, consumerTag)
+	consumer := returnArgs.Get(0).(*TestConsumerWrapper) // unchecked for now
+	consumer.handler = handler
+	consumer.queue = queue
+	consumer.consumerTag = consumerTag
+	return consumer, returnArgs.Error(1)
+}
+
+type TestConsumerWrapper struct {
+	handler     rabbitmq.Handler
+	queue       string
+	consumerTag string
+	isClosed    bool
+}
+
+func (m *TestConsumerWrapper) Close() {
+	println("closed consumer wrapper")
+	m.isClosed = true
+}
+
+func (m *TestConsumerWrapper) SimulateDelivery(delivery rabbitmq.Delivery) rabbitmq.Action {
+	return m.handler(delivery)
+}
+
+type MockPublisherWrapper struct {
 	mock.Mock
 }
 
-func (m *mockConnection) Channel() (Channel, error) {
-	args := m.Called()
-	amqpCh, _ := args.Get(0).(Channel)
-
-	return amqpCh, args.Error(1)
+func (m *MockPublisherWrapper) Close() {
+	m.Called()
 }
 
-func (m *mockConnection) NotifyClose(receiver chan *amqp.Error) chan *amqp.Error {
-	return receiver
-}
-
-func (m *mockConnection) Close() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-type mockChannel struct {
-	mock.Mock
-}
-
-func (m *mockChannel) QueueDeclare(
-	name string, durable bool, autoDelete bool, exclusive bool, noWait bool, args amqp.Table,
-) (amqp.Queue, error) {
-	mArgs := m.Called(name, durable, autoDelete, exclusive, noWait, args)
-	return mArgs.Get(0).(amqp.Queue), mArgs.Error(1)
-}
-
-func (m *mockChannel) Publish(exchange string, key string, mandatory bool, immediate bool, msg amqp.Publishing) error {
-	args := m.Called(exchange, key, mandatory, immediate, msg)
-	return args.Error(0)
-}
-
-func (m *mockChannel) Consume(
-	name string, consumerTag string, autoAck bool, exclusive bool, noLocal bool, noWait bool, args amqp.Table,
-) (<-chan amqp.Delivery, error) {
-	mArgs := m.Called(name, consumerTag, autoAck, exclusive, noLocal, noWait, args)
-	return mArgs.Get(0).(chan amqp.Delivery), mArgs.Error(1)
-}
-
-func (m *mockChannel) Ack(tag uint64, multiple bool) error {
-	args := m.Called(tag, multiple)
-	return args.Error(0)
-}
-
-func (m *mockChannel) Nack(tag uint64, multiple bool, requeue bool) error {
-	args := m.Called(tag, multiple, requeue)
-	return args.Error(0)
-}
-
-func (m *mockChannel) Reject(tag uint64, requeue bool) error {
-	args := m.Called(tag, requeue)
-	return args.Error(0)
-}
-
-func (m *mockChannel) Qos(prefetchCount int, prefetchSize int, global bool) error {
-	args := m.Called(prefetchCount, prefetchSize, global)
-	return args.Error(0)
-}
-
-func (m *mockChannel) NotifyClose(receiver chan *amqp.Error) chan *amqp.Error {
-	return receiver
+func (m *MockPublisherWrapper) Publish(
+	payload SeldonPayloadWithHeaders,
+	queueName string,
+) error {
+	returnArgs := m.Called(payload, queueName)
+	return returnArgs.Error(0)
 }
 
 type TestPayload struct {

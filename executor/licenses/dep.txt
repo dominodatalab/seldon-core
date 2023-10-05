@@ -342,6 +342,7 @@ github.com/ulikunitz/unixtime
 github.com/valyala/bytebufferpool
 github.com/valyala/fasthttp
 github.com/wagslane/go-password-validator
+github.com/wagslane/go-rabbitmq
 github.com/xdg-go/pbkdf2
 github.com/xdg-go/scram
 github.com/xdg-go/stringprep

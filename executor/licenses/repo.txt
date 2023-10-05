@@ -308,6 +308,7 @@ ulikunitz/unixtime
 valyala/bytebufferpool
 valyala/fasthttp
 wagslane/go-password-validator
+wagslane/go-rabbitmq
 xdg-go/pbkdf2
 xdg-go/scram
 xdg-go/stringprep

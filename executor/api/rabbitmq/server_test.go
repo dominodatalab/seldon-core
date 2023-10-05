@@ -1,25 +1,29 @@
 package rabbitmq
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"github.com/go-logr/logr/testr"
+	"github.com/golang/protobuf/jsonpb"
 	guuid "github.com/google/uuid"
 	. "github.com/onsi/gomega"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seldonio/seldon-core/executor/api"
+	"github.com/seldonio/seldon-core/executor/api/grpc/seldon/proto"
 	"github.com/seldonio/seldon-core/executor/api/payload"
 	"github.com/seldonio/seldon-core/executor/api/rest"
 	"github.com/seldonio/seldon-core/executor/api/test"
 	v1 "github.com/seldonio/seldon-core/operator/apis/machinelearning.seldon.io/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/wagslane/go-rabbitmq"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -49,11 +53,11 @@ func TestRabbitMqServer(t *testing.T) {
 	})
 	server := httptest.NewServer(handler)
 	defer server.Close()
-	serverUrl, err := url.Parse(server.URL)
-	g.Expect(err).Should(BeNil())
+	serverUrl, setupErr := url.Parse(server.URL)
+	g.Expect(setupErr).Should(BeNil())
 	urlParts := strings.Split(serverUrl.Host, ":")
-	port, err := strconv.Atoi(urlParts[1])
-	g.Expect(err).Should(BeNil())
+	port, setupErr := strconv.Atoi(urlParts[1])
+	g.Expect(setupErr).Should(BeNil())
 
 	p := v1.PredictorSpec{
 		Name: "p",
@@ -87,15 +91,78 @@ func TestRabbitMqServer(t *testing.T) {
 	testPuid := guuid.New().String()
 	testHeaders := map[string]interface{}{payload.SeldonPUIDHeader: testPuid}
 
-	invalidErrorJsonResponse := fmt.Sprintf(
+	// test predictor process returns the request payload as the response
+	validJson := fmt.Sprintf(
+		`{"meta":{"puid":"%v"},"jsonData":{"start":1,"stop":10}}`,
+		testPuid,
+	)
+	validRequestDelivery := rabbitmq.Delivery{
+		Delivery: amqp.Delivery{
+			ContentType:  "application/json",
+			DeliveryMode: rabbitmq.Persistent,
+			Body:         []byte(validJson),
+			Headers:      testHeaders,
+		},
+	}
+	validPayloadResponseWithHeaders := SeldonPayloadWithHeaders{
+		&payload.BytesPayload{
+			Msg:         []byte(validJson),
+			ContentType: "application/json",
+		},
+		TableToStringMap(testHeaders),
+	}
+
+	// test predictor process returns the request payload as the response
+	validJsonNoPuid := `{"jsonData":{"start":1,"stop":10}}`
+	validRequestNoPuidDelivery := rabbitmq.Delivery{
+		Delivery: amqp.Delivery{
+			ContentType:  "application/json",
+			DeliveryMode: rabbitmq.Persistent,
+			Body:         []byte(validJsonNoPuid),
+			Headers:      map[string]interface{}{},
+		},
+	}
+	validPayloadResponseNoPuid :=
+		&payload.BytesPayload{
+			Msg:         []byte(validJsonNoPuid),
+			ContentType: "application/json",
+		}
+
+	invalidContentType := "bogus"
+	invalidDelivery := rabbitmq.Delivery{
+		Delivery: amqp.Delivery{
+			ContentType: invalidContentType,
+			Body:        []byte(`bogus`),
+			Headers:     testHeaders,
+		},
+	}
+	invalidJsonResponse := fmt.Sprintf(
+		`{"status":{"info":"Prediction Failed","reason":"unknown payload type '%v'","status":"FAILURE"}}`,
+		invalidContentType,
+	)
+	invalidPayloadResponse :=
+		&payload.BytesPayload{
+			Msg:         []byte(invalidJsonResponse),
+			ContentType: "application/json",
+		}
+
+	// test predictor process returns the request payload as the response
+	errorJson := fmt.Sprintf(
 		`{"status":{"info":"Prediction Failed","reason":"unknown payload type 'bogus'","status":"FAILURE"},"meta":{"puid":"%v"}}`,
 		testPuid,
 	)
-	invalidErrorPublishing := amqp.Publishing{
-		ContentType:  "application/json",
-		DeliveryMode: amqp.Persistent,
-		Body:         []byte(invalidErrorJsonResponse),
-		Headers:      testHeaders,
+	errorPayloadResponse :=
+		&payload.BytesPayload{
+			Msg:         []byte(errorJson),
+			ContentType: "application/json",
+		}
+	errorDelivery := rabbitmq.Delivery{
+		Delivery: amqp.Delivery{
+			ContentType:  "application/json",
+			DeliveryMode: rabbitmq.Persistent,
+			Body:         []byte(errorJson),
+			Headers:      testHeaders,
+		},
 	}
 
 	t.Run("create server", func(t *testing.T) {
@@ -131,144 +198,246 @@ func TestRabbitMqServer(t *testing.T) {
 	})
 
 	/*
-	 * This makes sure the Serve() and predictAndPublishResponse() code runs and makes the proper calls
-	 * by hacking a bunch of mocks.
+	 * This makes sure the serve() code runs and makes the proper calls by setting up mocks.
 	 * It is not doing anything to validate the messages are properly processed.  That's challenging in a
 	 * unit test since the code connects to RabbitMQ.
 	 */
 	t.Run("serve", func(t *testing.T) {
-		mockRmqConn := &mockConnection{}
-		mockRmqChan := &mockChannel{}
-		mockConn := &connection{
-			conn:    mockRmqConn,
-			channel: mockRmqChan,
-		}
+		mockRmqConn := new(MockConnectionWrapper)
 
-		testDelivery := amqp.Delivery{
-			Acknowledger: mockRmqChan,
-			ContentType:  rest.ContentTypeJSON,
-			Body:         []byte(`{ "data": { "ndarray": [[1,2,3,4]] } }`),
-			Headers:      testHeaders,
-		}
+		mockPublisher := new(MockPublisherWrapper)
+		mockRmqConn.On("NewPublisher").Return(mockPublisher, nil)
+		mockPublisher.On("Close")
 
-		mockDeliveries := make(chan amqp.Delivery, 1)
-		mockDeliveries <- testDelivery
-		close(mockDeliveries)
+		testConsumer := new(TestConsumerWrapper)
+		testConsumer.isClosed = false
+		mockRmqConn.On(
+			"NewConsumer",
+			mock.Anything,
+			inputQueue,
+			mock.Anything,
+		).Return(testConsumer, nil)
 
-		mockRmqChan.On("Consume", inputQueue, mock.Anything, false, false, false, false,
-			amqp.Table{}).Return(mockDeliveries, nil)
-		mockRmqChan.On("Publish", "", outputQueue, publishMandatory, publishImmediate,
-			mock.MatchedBy(func(p amqp.Publishing) bool { return true })).Return(nil)
-		mockRmqChan.On("Ack", uint64(0), false).Return(nil)
+		wg := new(sync.WaitGroup)
+		termChan, err := testServer.serve(mockRmqConn, wg)
 
-		err := testServer.serve(mockConn)
+		termChan <- true
+		t.Log("waiting")
+		wg.Wait()
+		t.Log("done waiting")
 
 		assert.NoError(t, err)
 
-		mockRmqChan.AssertExpectations(t)
+		mockRmqConn.AssertExpectations(t)
+		mockPublisher.AssertExpectations(t)
+		assert.True(t, testConsumer.isClosed)
 	})
 
-	/*
-	 * This makes sure the Serve(), predictAndPublishResponse(), and createAndPublishErrorResponse() code runs and
-	 * makes the proper calls and returns an appropriate error message by hacking a bunch of mocks.
-	 */
-	t.Run("serveError", func(t *testing.T) {
-		mockRmqConn := &mockConnection{}
-		mockRmqChan := &mockChannel{}
-		mockConn := &connection{
-			conn:    mockRmqConn,
-			channel: mockRmqChan,
-		}
+	t.Run("process valid request", func(t *testing.T) {
+		mockRmqConn := new(MockConnectionWrapper)
 
-		invalidDelivery := amqp.Delivery{
-			Acknowledger: mockRmqChan,
-			ContentType:  "bogus",
-			Body:         []byte(`bogus`),
-			Headers:      testHeaders,
-			Redelivered:  true,
-		}
+		mockPublisher := new(MockPublisherWrapper)
+		mockRmqConn.On("NewPublisher").Return(mockPublisher, nil)
+		mockPublisher.On("Close")
 
-		mockDeliveries := make(chan amqp.Delivery, 1)
-		mockDeliveries <- invalidDelivery
-		close(mockDeliveries)
+		testConsumer := new(TestConsumerWrapper)
+		testConsumer.isClosed = false
+		mockRmqConn.On(
+			"NewConsumer",
+			mock.Anything,
+			inputQueue,
+			mock.Anything,
+		).Return(testConsumer, nil)
 
-		mockRmqChan.On("Consume", inputQueue, mock.Anything, false, false, false, false,
-			amqp.Table{}).Return(mockDeliveries, nil)
-		mockRmqChan.On("Publish", "", outputQueue, publishMandatory, publishImmediate,
-			invalidErrorPublishing).Return(nil)
-		mockRmqChan.On("Reject", uint64(0), false).Return(nil)
+		wg := new(sync.WaitGroup)
+		termChan, err := testServer.serve(mockRmqConn, wg)
 
-		err := testServer.serve(mockConn)
+		mockPublisher.On("Publish", validPayloadResponseWithHeaders, outputQueue).Return(nil)
+		action := testConsumer.SimulateDelivery(validRequestDelivery)
+		assert.Equal(t, rabbitmq.Ack, action)
+
+		termChan <- true
+		t.Log("waiting")
+		wg.Wait()
+		t.Log("done waiting")
 
 		assert.NoError(t, err)
 
-		mockRmqChan.AssertExpectations(t)
+		mockRmqConn.AssertExpectations(t)
+		mockPublisher.AssertExpectations(t)
+		assert.True(t, testConsumer.isClosed)
 	})
 
-	t.Run("createAndPublishErrorResponse", func(t *testing.T) {
-		mockRmqConn := &mockConnection{}
-		mockRmqChan := &mockChannel{}
-		mockConn := &connection{
-			conn:    mockRmqConn,
-			channel: mockRmqChan,
-		}
+	t.Run("process valid request missing puid", func(t *testing.T) {
+		mockRmqConn := new(MockConnectionWrapper)
 
-		testDelivery := amqp.Delivery{
-			Acknowledger: mockRmqChan,
-			ContentType:  rest.ContentTypeJSON,
-			Body:         []byte(`{ "data": { "ndarray": [[1,2,3,4]] } }`),
-			Headers:      testHeaders,
-		}
+		mockPublisher := new(MockPublisherWrapper)
+		mockRmqConn.On("NewPublisher").Return(mockPublisher, nil)
+		mockPublisher.On("Close")
 
-		publisher := &publisher{*mockConn, outputQueue}
+		testConsumer := new(TestConsumerWrapper)
+		testConsumer.isClosed = false
+		mockRmqConn.On(
+			"NewConsumer",
+			mock.Anything,
+			inputQueue,
+			mock.Anything,
+		).Return(testConsumer, nil)
 
-		// valid payload
-		error1Text := "error 1"
-		error1 := errors.New(error1Text)
-		generatedErrorPublishing1 := amqp.Publishing{
-			ContentType: "application/json",
-			Body: []byte(fmt.Sprintf(
-				`{"status":{"info":"Prediction Failed","reason":"%v","status":"FAILURE"},"meta":{"puid":"%v"}}`,
-				error1Text,
-				testPuid,
-			)),
-			DeliveryMode: amqp.Persistent,
-			Headers:      testHeaders,
-		}
-		mockRmqChan.On("Publish", "", outputQueue, true, false, generatedErrorPublishing1).Return(nil)
-		pl1, _ := DeliveryToPayload(testDelivery)
-		consumerError1 := ConsumerError{
-			err:      error1,
-			delivery: testDelivery,
-			pl:       pl1,
-		}
-		err1 := testServer.createAndPublishErrorResponse(consumerError1, publisher)
-		assert.NoError(t, err1)
+		wg := new(sync.WaitGroup)
+		termChan, err := testServer.serve(mockRmqConn, wg)
 
-		mockRmqChan.AssertExpectations(t)
+		mockPublisher.On(
+			"Publish",
+			mock.MatchedBy(matchingSeldonPayloadsWithPuid(t, validPayloadResponseNoPuid, false)),
+			outputQueue,
+		).Return(nil)
+		action := testConsumer.SimulateDelivery(validRequestNoPuidDelivery)
+		assert.Equal(t, rabbitmq.Ack, action)
 
-		// no payload
-		error2Text := "error 2"
-		error2 := errors.New(error2Text)
-		generatedErrorPublishing2 := amqp.Publishing{
-			ContentType:  "application/json",
-			DeliveryMode: amqp.Persistent,
-			Body: []byte(fmt.Sprintf(
-				`{"status":{"info":"Prediction Failed","reason":"%v","status":"FAILURE"},"meta":{"puid":"%v"}}`,
-				error2Text,
-				testPuid,
-			)),
-			Headers: testHeaders,
-		}
-		mockRmqChan.On("Publish", "", outputQueue, true, false, generatedErrorPublishing2).Return(nil)
-		consumerError2 := ConsumerError{
-			err:      error2,
-			delivery: testDelivery,
-		}
-		err2 := testServer.createAndPublishErrorResponse(consumerError2, publisher)
-		assert.NoError(t, err2)
+		termChan <- true
+		t.Log("waiting")
+		wg.Wait()
+		t.Log("done waiting")
 
-		mockRmqChan.AssertExpectations(t)
+		assert.NoError(t, err)
+
+		mockRmqConn.AssertExpectations(t)
+		mockPublisher.AssertExpectations(t)
+		assert.True(t, testConsumer.isClosed)
 	})
 
+	t.Run("process invalid request", func(t *testing.T) {
+		mockRmqConn := new(MockConnectionWrapper)
+
+		mockPublisher := new(MockPublisherWrapper)
+		mockRmqConn.On("NewPublisher").Return(mockPublisher, nil)
+		mockPublisher.On("Close")
+
+		testConsumer := new(TestConsumerWrapper)
+		testConsumer.isClosed = false
+		mockRmqConn.On(
+			"NewConsumer",
+			mock.Anything,
+			inputQueue,
+			mock.Anything,
+		).Return(testConsumer, nil)
+
+		wg := new(sync.WaitGroup)
+		termChan, err := testServer.serve(mockRmqConn, wg)
+
+		// test that payload is expected and Puid is added
+		mockPublisher.On(
+			"Publish",
+			mock.MatchedBy(matchingSeldonPayloadsWithPuid(t, invalidPayloadResponse, true)),
+			outputQueue,
+		).Return(nil)
+		action := testConsumer.SimulateDelivery(invalidDelivery)
+		assert.Equal(t, rabbitmq.NackDiscard, action)
+
+		termChan <- true
+		t.Log("waiting")
+		wg.Wait()
+		t.Log("done waiting")
+
+		assert.NoError(t, err)
+
+		mockRmqConn.AssertExpectations(t)
+		mockPublisher.AssertExpectations(t)
+		assert.True(t, testConsumer.isClosed)
+	})
+
+	t.Run("process error response", func(t *testing.T) {
+		mockRmqConn := new(MockConnectionWrapper)
+
+		mockPublisher := new(MockPublisherWrapper)
+		mockRmqConn.On("NewPublisher").Return(mockPublisher, nil)
+		mockPublisher.On("Close")
+
+		testConsumer := new(TestConsumerWrapper)
+		testConsumer.isClosed = false
+		mockRmqConn.On(
+			"NewConsumer",
+			mock.Anything,
+			inputQueue,
+			mock.Anything,
+		).Return(testConsumer, nil)
+
+		wg := new(sync.WaitGroup)
+		termChan, err := testServer.serve(mockRmqConn, wg)
+
+		mockPublisher.On(
+			"Publish",
+			mock.MatchedBy(matchingSeldonPayloadsWithPuid(t, errorPayloadResponse, true)),
+			outputQueue,
+		).Return(nil)
+		action := testConsumer.SimulateDelivery(errorDelivery)
+		assert.Equal(t, rabbitmq.Ack, action)
+
+		termChan <- true
+		t.Log("waiting")
+		wg.Wait()
+		t.Log("done waiting")
+
+		assert.NoError(t, err)
+
+		mockRmqConn.AssertExpectations(t)
+		mockPublisher.AssertExpectations(t)
+		assert.True(t, testConsumer.isClosed)
+	})
+}
+
+func addPuid(pl payload.SeldonPayload, puid string) (payload.SeldonPayload, error) {
+	switch pl.GetContentType() {
+	case rest.ContentTypeJSON:
+		requestBody := &proto.SeldonMessage{}
+		err := jsonpb.UnmarshalString(string(pl.GetPayload().([]byte)), requestBody)
+		if err != nil {
+			return nil, err
+		}
+		requestBody.Meta = &proto.Meta{
+			Puid: puid,
+		}
+		ma := jsonpb.Marshaler{}
+		marshaled, err := ma.MarshalToString(requestBody)
+		if err != nil {
+			return nil, err
+		}
+		return &payload.BytesPayload{
+			Msg:         []byte(marshaled),
+			ContentType: rest.ContentTypeJSON,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported content type '%v'", pl.GetContentType())
+	}
+}
+
+func samePayloads(pl1 payload.SeldonPayload, pl2 payload.SeldonPayload) bool {
+	providedBytes, _ := pl1.GetBytes()
+	referenceBytes, _ := pl2.GetBytes()
+	return bytes.Equal(providedBytes, referenceBytes) &&
+		pl1.GetContentType() == pl2.GetContentType() &&
+		pl1.GetContentEncoding() == pl2.GetContentEncoding()
+}
+
+func matchingSeldonPayloadsWithPuid(
+	t *testing.T,
+	reference payload.SeldonPayload,
+	addPuidToPayload bool,
+) func(SeldonPayloadWithHeaders) bool {
+	return func(pl SeldonPayloadWithHeaders) bool {
+		puidHeader := pl.Headers[payload.SeldonPUIDHeader]
+		var referencePayloadToUse payload.SeldonPayload
+		var err error
+		if addPuidToPayload {
+			referencePayloadToUse, err = addPuid(reference, puidHeader[0])
+			if err != nil {
+				t.Logf("error adding puid %v", err)
+				return false
+			}
+		} else {
+			referencePayloadToUse = reference
+		}
+		return puidHeader != nil && samePayloads(pl.Payload, referencePayloadToUse)
+	}
 }

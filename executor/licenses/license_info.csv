@@ -306,6 +306,7 @@ ulikunitz/unixtime,https://github.com/ulikunitz/unixtime/blob/master/LICENSE,BSD
 valyala/bytebufferpool,https://github.com/valyala/bytebufferpool/blob/master/LICENSE,MIT License,https://raw.githubusercontent.com/valyala/bytebufferpool/master/LICENSE
 valyala/fasthttp,https://github.com/valyala/fasthttp/blob/master/LICENSE,MIT License,https://raw.githubusercontent.com/valyala/fasthttp/master/LICENSE
 wagslane/go-password-validator,https://github.com/wagslane/go-password-validator/blob/main/LICENSE,MIT License,https://raw.githubusercontent.com/wagslane/go-password-validator/main/LICENSE
+wagslane/go-rabbitmq,https://github.com/wagslane/go-rabbitmq/blob/main/LICENSE,MIT License,https://raw.githubusercontent.com/wagslane/go-rabbitmq/main/LICENSE
 xdg-go/pbkdf2,https://github.com/xdg-go/pbkdf2/blob/main/LICENSE,Apache License 2.0,https://raw.githubusercontent.com/xdg-go/pbkdf2/main/LICENSE
 xdg-go/scram,https://github.com/xdg-go/scram/blob/master/LICENSE,Apache License 2.0,https://raw.githubusercontent.com/xdg-go/scram/master/LICENSE
 xdg-go/stringprep,https://github.com/xdg-go/stringprep/blob/master/LICENSE,Apache License 2.0,https://raw.githubusercontent.com/xdg-go/stringprep/master/LICENSE

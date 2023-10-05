@@ -8,6 +8,7 @@ import (
 	"github.com/seldonio/seldon-core/executor/api/grpc/seldon/proto"
 	"github.com/seldonio/seldon-core/executor/api/payload"
 	"github.com/seldonio/seldon-core/executor/api/rest"
+	rabbitmq "github.com/wagslane/go-rabbitmq"
 )
 
 func TableToStringMap(t amqp.Table) map[string][]string {
@@ -18,7 +19,7 @@ func TableToStringMap(t amqp.Table) map[string][]string {
 	return stringMap
 }
 
-func StringMapToTable(m map[string][]string) amqp.Table {
+func StringMapToTable(m map[string][]string) rabbitmq.Table {
 	table := make(map[string]interface{})
 	for key, values := range m {
 		// just take the first value, at least for now
@@ -27,7 +28,7 @@ func StringMapToTable(m map[string][]string) amqp.Table {
 	return table
 }
 
-func DeliveryToPayload(delivery amqp.Delivery) (*SeldonPayloadWithHeaders, error) {
+func DeliveryToPayload(delivery rabbitmq.Delivery) (*SeldonPayloadWithHeaders, error) {
 	var pl *SeldonPayloadWithHeaders = nil
 	var err error = nil
 

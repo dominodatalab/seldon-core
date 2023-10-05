@@ -16,11 +16,12 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.34.0
-	github.com/rabbitmq/amqp091-go v1.3.4
+	github.com/rabbitmq/amqp091-go v1.5.0
 	github.com/seldonio/seldon-core/operator v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.8.0
 	github.com/tensorflow/tensorflow/tensorflow/go/core v0.0.0-00010101000000-000000000000
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
+	github.com/wagslane/go-rabbitmq v0.12.1
 	go.uber.org/automaxprocs v1.4.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f
