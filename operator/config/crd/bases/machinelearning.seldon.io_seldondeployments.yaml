@@ -2828,10 +2828,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -2949,10 +2946,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -3085,10 +3079,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -3196,15 +3187,15 @@ spec:
                                       type: string
                                     ports:
                                       description: List of ports to expose from the
-                                        container. Exposing a port here gives the
-                                        system additional information about the network
-                                        connections a container uses, but is primarily
-                                        informational. Not specifying a port here
-                                        DOES NOT prevent that port from being exposed.
+                                        container. Not specifying a port here DOES
+                                        NOT prevent that port from being exposed.
                                         Any port which is listening on the default
                                         "0.0.0.0" address inside a container will
-                                        be accessible from the network. Cannot be
-                                        updated.
+                                        be accessible from the network. Modifying
+                                        this array with strategic merge patch may
+                                        corrupt the data. For more information See
+                                        https://github.com/kubernetes/kubernetes/issues/108255.
+                                        Cannot be updated.
                                       items:
                                         description: ContainerPort represents a network
                                           port in a single container.
@@ -3324,10 +3315,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -3749,10 +3737,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -4045,9 +4030,6 @@ spec:
                                   and it cannot be modified by updating the pod spec.
                                   In order to add an ephemeral container to an existing
                                   pod, use the pod's ephemeralcontainers subresource.
-                                  This field is beta-level and available on clusters
-                                  that haven't disabled the EphemeralContainers feature
-                                  gate.
                                 items:
                                   description: "An EphemeralContainer is a temporary
                                     container that you may add to an existing Pod
@@ -4059,9 +4041,7 @@ spec:
                                     causes the Pod to exceed its resource allocation.
                                     \n To add an ephemeral container, use the ephemeralcontainers
                                     subresource of an existing Pod. Ephemeral containers
-                                    may not be removed or restarted. \n This is a
-                                    beta feature available on clusters that haven't
-                                    disabled the EphemeralContainers feature gate."
+                                    may not be removed or restarted."
                                   properties:
                                     args:
                                       description: 'Arguments to the entrypoint. The
@@ -4343,10 +4323,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -4464,10 +4441,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -4599,10 +4573,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -4828,10 +4799,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -5244,10 +5212,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -5524,6 +5489,20 @@ spec:
                               hostPID:
                                 description: 'Use the host''s pid namespace. Optional:
                                   Default to false.'
+                                type: boolean
+                              hostUsers:
+                                description: 'Use the host''s user namespace. Optional:
+                                  Default to true. If set to true or not present,
+                                  the pod will be run in the host user namespace,
+                                  useful for when the pod needs a feature only available
+                                  to the host user namespace, such as loading a kernel
+                                  module with CAP_SYS_MODULE. When set to false, a
+                                  new userns is created for the pod. Setting false
+                                  is useful for mitigating container breakout vulnerabilities
+                                  even allowing users to run their containers as root
+                                  without actually having root privileges on the host.
+                                  This field is alpha-level and is only honored by
+                                  servers that enable the UserNamespacesSupport feature.'
                                 type: boolean
                               hostname:
                                 description: Specifies the hostname of the Pod If
@@ -5858,10 +5837,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -5979,10 +5955,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -6115,10 +6088,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -6226,15 +6196,15 @@ spec:
                                       type: string
                                     ports:
                                       description: List of ports to expose from the
-                                        container. Exposing a port here gives the
-                                        system additional information about the network
-                                        connections a container uses, but is primarily
-                                        informational. Not specifying a port here
-                                        DOES NOT prevent that port from being exposed.
+                                        container. Not specifying a port here DOES
+                                        NOT prevent that port from being exposed.
                                         Any port which is listening on the default
                                         "0.0.0.0" address inside a container will
-                                        be accessible from the network. Cannot be
-                                        updated.
+                                        be accessible from the network. Modifying
+                                        this array with strategic merge patch may
+                                        corrupt the data. For more information See
+                                        https://github.com/kubernetes/kubernetes/issues/108255.
+                                        Cannot be updated.
                                       items:
                                         description: ContainerPort represents a network
                                           port in a single container.
@@ -6354,10 +6324,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -6779,10 +6746,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -7035,20 +6999,19 @@ spec:
                                   the following fields must be unset: -securityContext.windowsOptions
                                   \n If the OS field is set to windows, following
                                   fields must be unset: - spec.hostPID - spec.hostIPC
-                                  - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile
-                                  - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy
-                                  - spec.securityContext.sysctls - spec.shareProcessNamespace
-                                  - spec.securityContext.runAsUser - spec.securityContext.runAsGroup
-                                  - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions
+                                  - spec.hostUsers - spec.securityContext.seLinuxOptions
+                                  - spec.securityContext.seccompProfile - spec.securityContext.fsGroup
+                                  - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls
+                                  - spec.shareProcessNamespace - spec.securityContext.runAsUser
+                                  - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups
+                                  - spec.containers[*].securityContext.seLinuxOptions
                                   - spec.containers[*].securityContext.seccompProfile
                                   - spec.containers[*].securityContext.capabilities
                                   - spec.containers[*].securityContext.readOnlyRootFilesystem
                                   - spec.containers[*].securityContext.privileged
                                   - spec.containers[*].securityContext.allowPrivilegeEscalation
                                   - spec.containers[*].securityContext.procMount -
-                                  spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup
-                                  This is a beta field and requires the IdentifyPodOS
-                                  feature"
+                                  spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
                                 properties:
                                   name:
                                     description: 'Name is the name of the operating
@@ -7504,6 +7467,21 @@ spec:
                                           type: object
                                       type: object
                                       x-kubernetes-map-type: atomic
+                                    matchLabelKeys:
+                                      description: MatchLabelKeys is a set of pod
+                                        label keys to select the pods over which spreading
+                                        will be calculated. The keys are used to lookup
+                                        values from the incoming pod labels, those
+                                        key-value labels are ANDed with labelSelector
+                                        to select the group of existing pods over
+                                        which spreading will be calculated for the
+                                        incoming pod. Keys that don't exist in the
+                                        incoming pod labels will be ignored. A null
+                                        or empty list means only match against labelSelector.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
                                     maxSkew:
                                       description: 'MaxSkew describes the degree to
                                         which pods may be unevenly distributed. When
@@ -7556,11 +7534,38 @@ spec:
                                         same labelSelector cannot be scheduled, because
                                         computed skew will be 3(3 - 0) if new Pod
                                         is scheduled to any of the three zones, it
-                                        will violate MaxSkew. \n This is an alpha
-                                        field and requires enabling MinDomainsInPodTopologySpread
-                                        feature gate."
+                                        will violate MaxSkew. \n This is a beta field
+                                        and requires the MinDomainsInPodTopologySpread
+                                        feature gate to be enabled (enabled by default)."
                                       format: int32
                                       type: integer
+                                    nodeAffinityPolicy:
+                                      description: "NodeAffinityPolicy indicates how
+                                        we will treat Pod's nodeAffinity/nodeSelector
+                                        when calculating pod topology spread skew.
+                                        Options are: - Honor: only nodes matching
+                                        nodeAffinity/nodeSelector are included in
+                                        the calculations. - Ignore: nodeAffinity/nodeSelector
+                                        are ignored. All nodes are included in the
+                                        calculations. \n If this value is nil, the
+                                        behavior is equivalent to the Honor policy.
+                                        This is a alpha-level feature enabled by the
+                                        NodeInclusionPolicyInPodTopologySpread feature
+                                        flag."
+                                      type: string
+                                    nodeTaintsPolicy:
+                                      description: "NodeTaintsPolicy indicates how
+                                        we will treat node taints when calculating
+                                        pod topology spread skew. Options are: - Honor:
+                                        nodes without taints, along with tainted nodes
+                                        for which the incoming pod has a toleration,
+                                        are included. - Ignore: node taints are ignored.
+                                        All nodes are included. \n If this value is
+                                        nil, the behavior is equivalent to the Ignore
+                                        policy. This is a alpha-level feature enabled
+                                        by the NodeInclusionPolicyInPodTopologySpread
+                                        feature flag."
+                                      type: string
                                     topologyKey:
                                       description: TopologyKey is the key of node
                                         labels. Nodes that have a label with this
@@ -7570,8 +7575,9 @@ spec:
                                         balanced number of pods into each bucket.
                                         We define a domain as a particular instance
                                         of a topology. Also, we define an eligible
-                                        domain as a domain whose nodes match the node
-                                        selector. e.g. If TopologyKey is "kubernetes.io/hostname",
+                                        domain as a domain whose nodes meet the requirements
+                                        of nodeAffinityPolicy and nodeTaintsPolicy.
+                                        e.g. If TopologyKey is "kubernetes.io/hostname",
                                         each Node is a domain of that topology. And,
                                         if TopologyKey is "topology.kubernetes.io/zone",
                                         each zone is a domain of that topology. It's
@@ -9746,10 +9752,7 @@ spec:
                                               header to be used in HTTP probes
                                             properties:
                                               name:
-                                                description: The header field name.
-                                                  This will be canonicalized upon
-                                                  output, so case-variant names will
-                                                  be understood as the same header.
+                                                description: The header field name
                                                 type: string
                                               value:
                                                 description: The header field value
@@ -9853,10 +9856,7 @@ spec:
                                               header to be used in HTTP probes
                                             properties:
                                               name:
-                                                description: The header field name.
-                                                  This will be canonicalized upon
-                                                  output, so case-variant names will
-                                                  be understood as the same header.
+                                                description: The header field name
                                                 type: string
                                               value:
                                                 description: The header field value
@@ -9976,10 +9976,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -10078,13 +10075,13 @@ spec:
                               type: string
                             ports:
                               description: List of ports to expose from the container.
-                                Exposing a port here gives the system additional information
-                                about the network connections a container uses, but
-                                is primarily informational. Not specifying a port
-                                here DOES NOT prevent that port from being exposed.
-                                Any port which is listening on the default "0.0.0.0"
-                                address inside a container will be accessible from
-                                the network. Cannot be updated.
+                                Not specifying a port here DOES NOT prevent that port
+                                from being exposed. Any port which is listening on
+                                the default "0.0.0.0" address inside a container will
+                                be accessible from the network. Modifying this array
+                                with strategic merge patch may corrupt the data. For
+                                more information See https://github.com/kubernetes/kubernetes/issues/108255.
+                                Cannot be updated.
                               items:
                                 description: ContainerPort represents a network port
                                   in a single container.
@@ -10191,10 +10188,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -10572,10 +10566,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -13996,10 +13987,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -14117,10 +14105,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -14253,10 +14238,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -14364,15 +14346,15 @@ spec:
                                       type: string
                                     ports:
                                       description: List of ports to expose from the
-                                        container. Exposing a port here gives the
-                                        system additional information about the network
-                                        connections a container uses, but is primarily
-                                        informational. Not specifying a port here
-                                        DOES NOT prevent that port from being exposed.
+                                        container. Not specifying a port here DOES
+                                        NOT prevent that port from being exposed.
                                         Any port which is listening on the default
                                         "0.0.0.0" address inside a container will
-                                        be accessible from the network. Cannot be
-                                        updated.
+                                        be accessible from the network. Modifying
+                                        this array with strategic merge patch may
+                                        corrupt the data. For more information See
+                                        https://github.com/kubernetes/kubernetes/issues/108255.
+                                        Cannot be updated.
                                       items:
                                         description: ContainerPort represents a network
                                           port in a single container.
@@ -14492,10 +14474,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -14917,10 +14896,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -15213,9 +15189,6 @@ spec:
                                   and it cannot be modified by updating the pod spec.
                                   In order to add an ephemeral container to an existing
                                   pod, use the pod's ephemeralcontainers subresource.
-                                  This field is beta-level and available on clusters
-                                  that haven't disabled the EphemeralContainers feature
-                                  gate.
                                 items:
                                   description: "An EphemeralContainer is a temporary
                                     container that you may add to an existing Pod
@@ -15227,9 +15200,7 @@ spec:
                                     causes the Pod to exceed its resource allocation.
                                     \n To add an ephemeral container, use the ephemeralcontainers
                                     subresource of an existing Pod. Ephemeral containers
-                                    may not be removed or restarted. \n This is a
-                                    beta feature available on clusters that haven't
-                                    disabled the EphemeralContainers feature gate."
+                                    may not be removed or restarted."
                                   properties:
                                     args:
                                       description: 'Arguments to the entrypoint. The
@@ -15511,10 +15482,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -15632,10 +15600,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -15767,10 +15732,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -15996,10 +15958,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -16412,10 +16371,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -16692,6 +16648,20 @@ spec:
                               hostPID:
                                 description: 'Use the host''s pid namespace. Optional:
                                   Default to false.'
+                                type: boolean
+                              hostUsers:
+                                description: 'Use the host''s user namespace. Optional:
+                                  Default to true. If set to true or not present,
+                                  the pod will be run in the host user namespace,
+                                  useful for when the pod needs a feature only available
+                                  to the host user namespace, such as loading a kernel
+                                  module with CAP_SYS_MODULE. When set to false, a
+                                  new userns is created for the pod. Setting false
+                                  is useful for mitigating container breakout vulnerabilities
+                                  even allowing users to run their containers as root
+                                  without actually having root privileges on the host.
+                                  This field is alpha-level and is only honored by
+                                  servers that enable the UserNamespacesSupport feature.'
                                 type: boolean
                               hostname:
                                 description: Specifies the hostname of the Pod If
@@ -17026,10 +16996,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -17147,10 +17114,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -17283,10 +17247,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -17394,15 +17355,15 @@ spec:
                                       type: string
                                     ports:
                                       description: List of ports to expose from the
-                                        container. Exposing a port here gives the
-                                        system additional information about the network
-                                        connections a container uses, but is primarily
-                                        informational. Not specifying a port here
-                                        DOES NOT prevent that port from being exposed.
+                                        container. Not specifying a port here DOES
+                                        NOT prevent that port from being exposed.
                                         Any port which is listening on the default
                                         "0.0.0.0" address inside a container will
-                                        be accessible from the network. Cannot be
-                                        updated.
+                                        be accessible from the network. Modifying
+                                        this array with strategic merge patch may
+                                        corrupt the data. For more information See
+                                        https://github.com/kubernetes/kubernetes/issues/108255.
+                                        Cannot be updated.
                                       items:
                                         description: ContainerPort represents a network
                                           port in a single container.
@@ -17522,10 +17483,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -17947,10 +17905,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -18203,20 +18158,19 @@ spec:
                                   the following fields must be unset: -securityContext.windowsOptions
                                   \n If the OS field is set to windows, following
                                   fields must be unset: - spec.hostPID - spec.hostIPC
-                                  - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile
-                                  - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy
-                                  - spec.securityContext.sysctls - spec.shareProcessNamespace
-                                  - spec.securityContext.runAsUser - spec.securityContext.runAsGroup
-                                  - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions
+                                  - spec.hostUsers - spec.securityContext.seLinuxOptions
+                                  - spec.securityContext.seccompProfile - spec.securityContext.fsGroup
+                                  - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls
+                                  - spec.shareProcessNamespace - spec.securityContext.runAsUser
+                                  - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups
+                                  - spec.containers[*].securityContext.seLinuxOptions
                                   - spec.containers[*].securityContext.seccompProfile
                                   - spec.containers[*].securityContext.capabilities
                                   - spec.containers[*].securityContext.readOnlyRootFilesystem
                                   - spec.containers[*].securityContext.privileged
                                   - spec.containers[*].securityContext.allowPrivilegeEscalation
                                   - spec.containers[*].securityContext.procMount -
-                                  spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup
-                                  This is a beta field and requires the IdentifyPodOS
-                                  feature"
+                                  spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
                                 properties:
                                   name:
                                     description: 'Name is the name of the operating
@@ -18672,6 +18626,21 @@ spec:
                                           type: object
                                       type: object
                                       x-kubernetes-map-type: atomic
+                                    matchLabelKeys:
+                                      description: MatchLabelKeys is a set of pod
+                                        label keys to select the pods over which spreading
+                                        will be calculated. The keys are used to lookup
+                                        values from the incoming pod labels, those
+                                        key-value labels are ANDed with labelSelector
+                                        to select the group of existing pods over
+                                        which spreading will be calculated for the
+                                        incoming pod. Keys that don't exist in the
+                                        incoming pod labels will be ignored. A null
+                                        or empty list means only match against labelSelector.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
                                     maxSkew:
                                       description: 'MaxSkew describes the degree to
                                         which pods may be unevenly distributed. When
@@ -18724,11 +18693,38 @@ spec:
                                         same labelSelector cannot be scheduled, because
                                         computed skew will be 3(3 - 0) if new Pod
                                         is scheduled to any of the three zones, it
-                                        will violate MaxSkew. \n This is an alpha
-                                        field and requires enabling MinDomainsInPodTopologySpread
-                                        feature gate."
+                                        will violate MaxSkew. \n This is a beta field
+                                        and requires the MinDomainsInPodTopologySpread
+                                        feature gate to be enabled (enabled by default)."
                                       format: int32
                                       type: integer
+                                    nodeAffinityPolicy:
+                                      description: "NodeAffinityPolicy indicates how
+                                        we will treat Pod's nodeAffinity/nodeSelector
+                                        when calculating pod topology spread skew.
+                                        Options are: - Honor: only nodes matching
+                                        nodeAffinity/nodeSelector are included in
+                                        the calculations. - Ignore: nodeAffinity/nodeSelector
+                                        are ignored. All nodes are included in the
+                                        calculations. \n If this value is nil, the
+                                        behavior is equivalent to the Honor policy.
+                                        This is a alpha-level feature enabled by the
+                                        NodeInclusionPolicyInPodTopologySpread feature
+                                        flag."
+                                      type: string
+                                    nodeTaintsPolicy:
+                                      description: "NodeTaintsPolicy indicates how
+                                        we will treat node taints when calculating
+                                        pod topology spread skew. Options are: - Honor:
+                                        nodes without taints, along with tainted nodes
+                                        for which the incoming pod has a toleration,
+                                        are included. - Ignore: node taints are ignored.
+                                        All nodes are included. \n If this value is
+                                        nil, the behavior is equivalent to the Ignore
+                                        policy. This is a alpha-level feature enabled
+                                        by the NodeInclusionPolicyInPodTopologySpread
+                                        feature flag."
+                                      type: string
                                     topologyKey:
                                       description: TopologyKey is the key of node
                                         labels. Nodes that have a label with this
@@ -18738,8 +18734,9 @@ spec:
                                         balanced number of pods into each bucket.
                                         We define a domain as a particular instance
                                         of a topology. Also, we define an eligible
-                                        domain as a domain whose nodes match the node
-                                        selector. e.g. If TopologyKey is "kubernetes.io/hostname",
+                                        domain as a domain whose nodes meet the requirements
+                                        of nodeAffinityPolicy and nodeTaintsPolicy.
+                                        e.g. If TopologyKey is "kubernetes.io/hostname",
                                         each Node is a domain of that topology. And,
                                         if TopologyKey is "topology.kubernetes.io/zone",
                                         each zone is a domain of that topology. It's
@@ -20914,10 +20911,7 @@ spec:
                                               header to be used in HTTP probes
                                             properties:
                                               name:
-                                                description: The header field name.
-                                                  This will be canonicalized upon
-                                                  output, so case-variant names will
-                                                  be understood as the same header.
+                                                description: The header field name
                                                 type: string
                                               value:
                                                 description: The header field value
@@ -21021,10 +21015,7 @@ spec:
                                               header to be used in HTTP probes
                                             properties:
                                               name:
-                                                description: The header field name.
-                                                  This will be canonicalized upon
-                                                  output, so case-variant names will
-                                                  be understood as the same header.
+                                                description: The header field name
                                                 type: string
                                               value:
                                                 description: The header field value
@@ -21144,10 +21135,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -21246,13 +21234,13 @@ spec:
                               type: string
                             ports:
                               description: List of ports to expose from the container.
-                                Exposing a port here gives the system additional information
-                                about the network connections a container uses, but
-                                is primarily informational. Not specifying a port
-                                here DOES NOT prevent that port from being exposed.
-                                Any port which is listening on the default "0.0.0.0"
-                                address inside a container will be accessible from
-                                the network. Cannot be updated.
+                                Not specifying a port here DOES NOT prevent that port
+                                from being exposed. Any port which is listening on
+                                the default "0.0.0.0" address inside a container will
+                                be accessible from the network. Modifying this array
+                                with strategic merge patch may corrupt the data. For
+                                more information See https://github.com/kubernetes/kubernetes/issues/108255.
+                                Cannot be updated.
                               items:
                                 description: ContainerPort represents a network port
                                   in a single container.
@@ -21359,10 +21347,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -21740,10 +21725,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -25164,10 +25146,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -25285,10 +25264,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -25421,10 +25397,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -25532,15 +25505,15 @@ spec:
                                       type: string
                                     ports:
                                       description: List of ports to expose from the
-                                        container. Exposing a port here gives the
-                                        system additional information about the network
-                                        connections a container uses, but is primarily
-                                        informational. Not specifying a port here
-                                        DOES NOT prevent that port from being exposed.
+                                        container. Not specifying a port here DOES
+                                        NOT prevent that port from being exposed.
                                         Any port which is listening on the default
                                         "0.0.0.0" address inside a container will
-                                        be accessible from the network. Cannot be
-                                        updated.
+                                        be accessible from the network. Modifying
+                                        this array with strategic merge patch may
+                                        corrupt the data. For more information See
+                                        https://github.com/kubernetes/kubernetes/issues/108255.
+                                        Cannot be updated.
                                       items:
                                         description: ContainerPort represents a network
                                           port in a single container.
@@ -25660,10 +25633,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -26085,10 +26055,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -26381,9 +26348,6 @@ spec:
                                   and it cannot be modified by updating the pod spec.
                                   In order to add an ephemeral container to an existing
                                   pod, use the pod's ephemeralcontainers subresource.
-                                  This field is beta-level and available on clusters
-                                  that haven't disabled the EphemeralContainers feature
-                                  gate.
                                 items:
                                   description: "An EphemeralContainer is a temporary
                                     container that you may add to an existing Pod
@@ -26395,9 +26359,7 @@ spec:
                                     causes the Pod to exceed its resource allocation.
                                     \n To add an ephemeral container, use the ephemeralcontainers
                                     subresource of an existing Pod. Ephemeral containers
-                                    may not be removed or restarted. \n This is a
-                                    beta feature available on clusters that haven't
-                                    disabled the EphemeralContainers feature gate."
+                                    may not be removed or restarted."
                                   properties:
                                     args:
                                       description: 'Arguments to the entrypoint. The
@@ -26679,10 +26641,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -26800,10 +26759,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -26935,10 +26891,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -27164,10 +27117,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -27580,10 +27530,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -27860,6 +27807,20 @@ spec:
                               hostPID:
                                 description: 'Use the host''s pid namespace. Optional:
                                   Default to false.'
+                                type: boolean
+                              hostUsers:
+                                description: 'Use the host''s user namespace. Optional:
+                                  Default to true. If set to true or not present,
+                                  the pod will be run in the host user namespace,
+                                  useful for when the pod needs a feature only available
+                                  to the host user namespace, such as loading a kernel
+                                  module with CAP_SYS_MODULE. When set to false, a
+                                  new userns is created for the pod. Setting false
+                                  is useful for mitigating container breakout vulnerabilities
+                                  even allowing users to run their containers as root
+                                  without actually having root privileges on the host.
+                                  This field is alpha-level and is only honored by
+                                  servers that enable the UserNamespacesSupport feature.'
                                 type: boolean
                               hostname:
                                 description: Specifies the hostname of the Pod If
@@ -28194,10 +28155,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -28315,10 +28273,7 @@ spec:
                                                     properties:
                                                       name:
                                                         description: The header field
-                                                          name. This will be canonicalized
-                                                          upon output, so case-variant
-                                                          names will be understood
-                                                          as the same header.
+                                                          name
                                                         type: string
                                                       value:
                                                         description: The header field
@@ -28451,10 +28406,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -28562,15 +28514,15 @@ spec:
                                       type: string
                                     ports:
                                       description: List of ports to expose from the
-                                        container. Exposing a port here gives the
-                                        system additional information about the network
-                                        connections a container uses, but is primarily
-                                        informational. Not specifying a port here
-                                        DOES NOT prevent that port from being exposed.
+                                        container. Not specifying a port here DOES
+                                        NOT prevent that port from being exposed.
                                         Any port which is listening on the default
                                         "0.0.0.0" address inside a container will
-                                        be accessible from the network. Cannot be
-                                        updated.
+                                        be accessible from the network. Modifying
+                                        this array with strategic merge patch may
+                                        corrupt the data. For more information See
+                                        https://github.com/kubernetes/kubernetes/issues/108255.
+                                        Cannot be updated.
                                       items:
                                         description: ContainerPort represents a network
                                           port in a single container.
@@ -28690,10 +28642,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -29115,10 +29064,7 @@ spec:
                                                 properties:
                                                   name:
                                                     description: The header field
-                                                      name. This will be canonicalized
-                                                      upon output, so case-variant
-                                                      names will be understood as
-                                                      the same header.
+                                                      name
                                                     type: string
                                                   value:
                                                     description: The header field
@@ -29371,20 +29317,19 @@ spec:
                                   the following fields must be unset: -securityContext.windowsOptions
                                   \n If the OS field is set to windows, following
                                   fields must be unset: - spec.hostPID - spec.hostIPC
-                                  - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile
-                                  - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy
-                                  - spec.securityContext.sysctls - spec.shareProcessNamespace
-                                  - spec.securityContext.runAsUser - spec.securityContext.runAsGroup
-                                  - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions
+                                  - spec.hostUsers - spec.securityContext.seLinuxOptions
+                                  - spec.securityContext.seccompProfile - spec.securityContext.fsGroup
+                                  - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls
+                                  - spec.shareProcessNamespace - spec.securityContext.runAsUser
+                                  - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups
+                                  - spec.containers[*].securityContext.seLinuxOptions
                                   - spec.containers[*].securityContext.seccompProfile
                                   - spec.containers[*].securityContext.capabilities
                                   - spec.containers[*].securityContext.readOnlyRootFilesystem
                                   - spec.containers[*].securityContext.privileged
                                   - spec.containers[*].securityContext.allowPrivilegeEscalation
                                   - spec.containers[*].securityContext.procMount -
-                                  spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup
-                                  This is a beta field and requires the IdentifyPodOS
-                                  feature"
+                                  spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
                                 properties:
                                   name:
                                     description: 'Name is the name of the operating
@@ -29840,6 +29785,21 @@ spec:
                                           type: object
                                       type: object
                                       x-kubernetes-map-type: atomic
+                                    matchLabelKeys:
+                                      description: MatchLabelKeys is a set of pod
+                                        label keys to select the pods over which spreading
+                                        will be calculated. The keys are used to lookup
+                                        values from the incoming pod labels, those
+                                        key-value labels are ANDed with labelSelector
+                                        to select the group of existing pods over
+                                        which spreading will be calculated for the
+                                        incoming pod. Keys that don't exist in the
+                                        incoming pod labels will be ignored. A null
+                                        or empty list means only match against labelSelector.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
                                     maxSkew:
                                       description: 'MaxSkew describes the degree to
                                         which pods may be unevenly distributed. When
@@ -29892,11 +29852,38 @@ spec:
                                         same labelSelector cannot be scheduled, because
                                         computed skew will be 3(3 - 0) if new Pod
                                         is scheduled to any of the three zones, it
-                                        will violate MaxSkew. \n This is an alpha
-                                        field and requires enabling MinDomainsInPodTopologySpread
-                                        feature gate."
+                                        will violate MaxSkew. \n This is a beta field
+                                        and requires the MinDomainsInPodTopologySpread
+                                        feature gate to be enabled (enabled by default)."
                                       format: int32
                                       type: integer
+                                    nodeAffinityPolicy:
+                                      description: "NodeAffinityPolicy indicates how
+                                        we will treat Pod's nodeAffinity/nodeSelector
+                                        when calculating pod topology spread skew.
+                                        Options are: - Honor: only nodes matching
+                                        nodeAffinity/nodeSelector are included in
+                                        the calculations. - Ignore: nodeAffinity/nodeSelector
+                                        are ignored. All nodes are included in the
+                                        calculations. \n If this value is nil, the
+                                        behavior is equivalent to the Honor policy.
+                                        This is a alpha-level feature enabled by the
+                                        NodeInclusionPolicyInPodTopologySpread feature
+                                        flag."
+                                      type: string
+                                    nodeTaintsPolicy:
+                                      description: "NodeTaintsPolicy indicates how
+                                        we will treat node taints when calculating
+                                        pod topology spread skew. Options are: - Honor:
+                                        nodes without taints, along with tainted nodes
+                                        for which the incoming pod has a toleration,
+                                        are included. - Ignore: node taints are ignored.
+                                        All nodes are included. \n If this value is
+                                        nil, the behavior is equivalent to the Ignore
+                                        policy. This is a alpha-level feature enabled
+                                        by the NodeInclusionPolicyInPodTopologySpread
+                                        feature flag."
+                                      type: string
                                     topologyKey:
                                       description: TopologyKey is the key of node
                                         labels. Nodes that have a label with this
@@ -29906,8 +29893,9 @@ spec:
                                         balanced number of pods into each bucket.
                                         We define a domain as a particular instance
                                         of a topology. Also, we define an eligible
-                                        domain as a domain whose nodes match the node
-                                        selector. e.g. If TopologyKey is "kubernetes.io/hostname",
+                                        domain as a domain whose nodes meet the requirements
+                                        of nodeAffinityPolicy and nodeTaintsPolicy.
+                                        e.g. If TopologyKey is "kubernetes.io/hostname",
                                         each Node is a domain of that topology. And,
                                         if TopologyKey is "topology.kubernetes.io/zone",
                                         each zone is a domain of that topology. It's
@@ -32082,10 +32070,7 @@ spec:
                                               header to be used in HTTP probes
                                             properties:
                                               name:
-                                                description: The header field name.
-                                                  This will be canonicalized upon
-                                                  output, so case-variant names will
-                                                  be understood as the same header.
+                                                description: The header field name
                                                 type: string
                                               value:
                                                 description: The header field value
@@ -32189,10 +32174,7 @@ spec:
                                               header to be used in HTTP probes
                                             properties:
                                               name:
-                                                description: The header field name.
-                                                  This will be canonicalized upon
-                                                  output, so case-variant names will
-                                                  be understood as the same header.
+                                                description: The header field name
                                                 type: string
                                               value:
                                                 description: The header field value
@@ -32312,10 +32294,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -32414,13 +32393,13 @@ spec:
                               type: string
                             ports:
                               description: List of ports to expose from the container.
-                                Exposing a port here gives the system additional information
-                                about the network connections a container uses, but
-                                is primarily informational. Not specifying a port
-                                here DOES NOT prevent that port from being exposed.
-                                Any port which is listening on the default "0.0.0.0"
-                                address inside a container will be accessible from
-                                the network. Cannot be updated.
+                                Not specifying a port here DOES NOT prevent that port
+                                from being exposed. Any port which is listening on
+                                the default "0.0.0.0" address inside a container will
+                                be accessible from the network. Modifying this array
+                                with strategic merge patch may corrupt the data. For
+                                more information See https://github.com/kubernetes/kubernetes/issues/108255.
+                                Cannot be updated.
                               items:
                                 description: ContainerPort represents a network port
                                   in a single container.
@@ -32527,10 +32506,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
@@ -32908,10 +32884,7 @@ spec:
                                           header to be used in HTTP probes
                                         properties:
                                           name:
-                                            description: The header field name. This
-                                              will be canonicalized upon output, so
-                                              case-variant names will be understood
-                                              as the same header.
+                                            description: The header field name
                                             type: string
                                           value:
                                             description: The header field value
