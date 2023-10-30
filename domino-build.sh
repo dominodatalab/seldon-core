@@ -2,11 +2,13 @@
 set -o nounset -o errexit -o pipefail
 set -e
 
-nopush_flag=''
+auto_tag_flag=''
+no_push_flag=''
 tag_arg=''
-while getopts 'nt:' flag; do
+while getopts 'ant:' flag; do
   case "${flag}" in
-    n) nopush_flag='true' ;;
+    a) auto_tag_flag='true' ;;
+    n) no_push_flag='true' ;;
     t) tag_arg="${OPTARG}" ;;
     *)
       echo "Unexpected option ${flag}"
@@ -14,7 +16,8 @@ while getopts 'nt:' flag; do
       ;;
   esac
 done
-readonly nopush_flag
+readonly auto_tag_flag
+readonly no_push_flag
 readonly tag_arg
 
 SELDON_REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -35,6 +38,11 @@ if [ -n "${tag_arg}" ]; then
   TARGET_IMAGE_TAGS+=("${tag_arg}")
 fi
 
+GIT_HEAD_TAG="$(git describe --tags HEAD)"
+if [ -n "${auto_tag_flag}" ] && [ -n "${GIT_HEAD_TAG}" ]; then
+  TARGET_IMAGE_TAGS+=("${GIT_HEAD_TAG}")
+fi
+
 echo -e "\n  Building operator...\n"
 cd "$SELDON_REPO/operator"
 make docker-build-no-test
@@ -45,7 +53,7 @@ make docker-build
 
 cd "${SELDON_REPO}"
 
-if [ "${nopush_flag}" == "" ]; then
+if [ "${no_push_flag}" == "" ]; then
 
   if [ -f ~/.docker/config.json ] && [ "$(cat ~/.docker/config.json | jq '.auths | has("quay.io")')" == "true" ]; then
     echo -e "[Docker is already logged into quay.io, using existing credentials.]"

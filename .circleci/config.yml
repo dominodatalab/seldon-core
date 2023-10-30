@@ -34,7 +34,7 @@ jobs:
           command: docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
       - run:
           name: "Seldon-core Domino Build & Push Script"
-          command: ./domino-build.sh
+          command: ./domino-build.sh -a
       - persist_to_workspace:
           root: ~/
           paths:
