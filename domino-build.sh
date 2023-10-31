@@ -45,7 +45,7 @@ fi
 
 echo -e "\n  Building operator...\n"
 cd "$SELDON_REPO/operator"
-make docker-build-no-test
+make docker-build
 
 echo -e "\n  Building executor...\n"
 cd "$SELDON_REPO/executor"
