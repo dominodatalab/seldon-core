@@ -2,23 +2,23 @@
 set -o nounset -o errexit -o pipefail
 set -e
 
-auto_tag_flag=''
-no_push_flag=''
-tag_arg=''
+AUTO_TAG_FLAG=''
+NO_PUSH_FLAG=''
+TAG_ARG=''
 while getopts 'ant:' flag; do
   case "${flag}" in
-    a) auto_tag_flag='true' ;;
-    n) no_push_flag='true' ;;
-    t) tag_arg="${OPTARG}" ;;
+    a) AUTO_TAG_FLAG='true' ;;
+    n) NO_PUSH_FLAG='true' ;;
+    t) TAG_ARG="${OPTARG}" ;;
     *)
       echo "Unexpected option ${flag}"
       exit 1
       ;;
   esac
 done
-readonly auto_tag_flag
-readonly no_push_flag
-readonly tag_arg
+readonly AUTO_TAG_FLAG
+readonly NO_PUSH_FLAG
+readonly TAG_ARG
 
 SELDON_REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -34,12 +34,12 @@ if [ -n "${BRANCH_NAME}" ]; then
   TARGET_IMAGE_TAGS+=("${SOURCE_IMAGE_TAG}-${BRANCH_NAME}.latest")
 fi
 
-if [ -n "${tag_arg}" ]; then
-  TARGET_IMAGE_TAGS+=("${tag_arg}")
+if [ -n "${TAG_ARG}" ]; then
+  TARGET_IMAGE_TAGS+=("${TAG_ARG}")
 fi
 
 GIT_HEAD_TAG="$(git describe --tags HEAD)"
-if [ -n "${auto_tag_flag}" ] && [ -n "${GIT_HEAD_TAG}" ]; then
+if [ -n "${AUTO_TAG_FLAG}" ] && [ -n "${GIT_HEAD_TAG}" ]; then
   TARGET_IMAGE_TAGS+=("${GIT_HEAD_TAG}")
 fi
 
@@ -53,7 +53,7 @@ make docker-build
 
 cd "${SELDON_REPO}"
 
-if [ "${no_push_flag}" == "" ]; then
+if [ -z "${NO_PUSH_FLAG}" ]; then
 
   if [ -f ~/.docker/config.json ] && [ "$(cat ~/.docker/config.json | jq '.auths | has("quay.io")')" == "true" ]; then
     echo -e "[Docker is already logged into quay.io, using existing credentials.]"
@@ -75,12 +75,12 @@ if [ "${no_push_flag}" == "" ]; then
     docker tag "seldonio/seldon-core-executor:${SOURCE_IMAGE_TAG}" "quay.io/domino/seldon-core-executor:${TARGET_IMAGE_TAG}"
     echo -e "  Tagged executor as ${TARGET_IMAGE_TAG}"
 
-    operator_target="quay.io/domino/seldon-core-operator:${TARGET_IMAGE_TAG}"
+    readonly operator_target="quay.io/domino/seldon-core-operator:${TARGET_IMAGE_TAG}"
     echo -e "\n  Pushing operator..."
     docker push "${operator_target}"
     echo -e "  *** Pushed operator to ${operator_target} *** "
 
-    executor_target="quay.io/domino/seldon-core-executor:${TARGET_IMAGE_TAG}"
+    readonly executor_target="quay.io/domino/seldon-core-executor:${TARGET_IMAGE_TAG}"
     echo -e "\n  Pushing executor...\n"
     docker push "${executor_target}"
     echo -e "  *** Pushed executor to ${executor_target} *** \n"
