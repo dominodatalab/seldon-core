@@ -75,15 +75,15 @@ if [ -z "${NO_PUSH_FLAG}" ]; then
     docker tag "seldonio/seldon-core-executor:${SOURCE_IMAGE_TAG}" "quay.io/domino/seldon-core-executor:${TARGET_IMAGE_TAG}"
     echo -e "  Tagged executor as ${TARGET_IMAGE_TAG}"
 
-    readonly operator_tag="quay.io/domino/seldon-core-operator:${TARGET_IMAGE_TAG}"
+    readonly operator_target="quay.io/domino/seldon-core-operator:${TARGET_IMAGE_TAG}"
     echo -e "\n  Pushing operator..."
-    docker push "${operator_tag]}"
-    echo -e "  *** Pushed operator to ${operator_tag} *** "
+    docker push "${operator_target}"
+    echo -e "  *** Pushed operator to ${operator_target} *** "
 
-    readonly executor_tag="quay.io/domino/seldon-core-executor:${TARGET_IMAGE_TAG}"
+    readonly executor_target="quay.io/domino/seldon-core-executor:${TARGET_IMAGE_TAG}"
     echo -e "\n  Pushing executor...\n"
-    docker push "${executor_tag}"
-    echo -e "  *** Pushed executor to ${executor_tag} *** \n"
+    docker push "${executor_target}"
+    echo -e "  *** Pushed executor to ${executor_target} *** \n"
 
   done
 
