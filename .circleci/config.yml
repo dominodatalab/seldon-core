@@ -94,7 +94,7 @@ workflows:
             - org-global
           filters:
             tags:
-              only: /v\d+(\.\d+)*(-.*)*/
+              only: /\d+(\.\d+)*(-.*)*-rabbitmq(-.*)*/
       - test:
           context:
             - org-global
@@ -102,4 +102,4 @@ workflows:
             - build-and-push
           filters:
             tags:
-              only: /v\d+(\.\d+)*(-.*)*/
+              only: /\d+(\.\d+)*(-.*)*-rabbitmq(-.*)*/
