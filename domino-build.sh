@@ -38,7 +38,7 @@ if [ -n "${TAG_ARG}" ]; then
   TARGET_IMAGE_TAGS+=("${TAG_ARG}")
 fi
 
-GIT_HEAD_TAG="$(git describe --tags HEAD)"
+GIT_HEAD_TAG="$(git describe --tags --exact-match HEAD 2> /dev/null || echo "")"
 if [ -n "${AUTO_TAG_FLAG}" ] && [ -n "${GIT_HEAD_TAG}" ]; then
   TARGET_IMAGE_TAGS+=("${GIT_HEAD_TAG}")
 fi
