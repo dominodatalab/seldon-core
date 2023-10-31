@@ -53,11 +53,11 @@ jobs:
           at: ~/
       - checkout
       - helm/install-helm-client:
-          version: v3.6.3
+          version: v3.13.1
       - run:
           name: Install and Launch Kubernetes
           command: |
-            curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.24.3+k3s1 sh -x -
+            curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.28.3+k3s1 sh -x -
             sleep 10
             kubectl wait --for=condition=Available --timeout=60s deployments --all -n kube-system
       - run:
