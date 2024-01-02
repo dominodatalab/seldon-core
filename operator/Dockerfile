@@ -1,4 +1,5 @@
 # Build the manager binary
+# 1.20-bookworm image points to the latest go 1.20.x
 FROM golang:1.20-bookworm as builder
 
 WORKDIR /workspace
