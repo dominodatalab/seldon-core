@@ -1,4 +1,4 @@
-FROM seldonio/seldon-core-s2i-python3:0.2
+FROM seldonio/seldon-core-s2i-python3:0.18
 
 RUN apt-get update && apt-get install -y \
     	build-essential libssl1.0-dev libopencv-dev libopencv-core-dev python-pil \

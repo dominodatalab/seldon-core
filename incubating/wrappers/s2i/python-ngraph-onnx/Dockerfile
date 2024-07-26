@@ -1,4 +1,4 @@
-FROM seldonio/seldon-core-s2i-python3:0.4
+FROM seldonio/seldon-core-s2i-python3:0.18
 
 RUN apt-get update && apt-get install -y \
 	build-essential cmake clang-3.9 clang-format-3.9 \
