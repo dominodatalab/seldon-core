@@ -7,7 +7,7 @@ IMAGE_NAME_BASE_REDHAT=${IMAGE_NAME_BASE}-ubi8
 IMG ?= seldonio/${IMAGE_NAME_BASE}:${VERSION}
 IMG_REDHAT ?= seldonio/${IMAGE_NAME_BASE_REDHAT}:${VERSION}
 
-ENVTEST_K8S_VERSION = 1.27
+ENVTEST_K8S_VERSION = 1.28
 KIND_NAME ?= kind
 
 # For labeling the operator Docker image(s)
@@ -212,7 +212,7 @@ controller-gen: ## Download controller-gen locally if necessary.
 ENVTEST = $(shell pwd)/bin/setup-envtest
 .PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20221206203637-3da2de04734a)
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.18)
 
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
