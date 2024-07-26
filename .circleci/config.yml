@@ -57,7 +57,7 @@ jobs:
       - run:
           name: Install and Launch Kubernetes
           command: |
-            curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.28.12+k3s1 sh -x -
+            curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.28.11+k3s2 sh -x -
             sleep 10
             kubectl wait --for=condition=Available --timeout=60s deployments --all -n kube-system
       - run:
