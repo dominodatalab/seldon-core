@@ -7,7 +7,7 @@ IMAGE_NAME_BASE_REDHAT=${IMAGE_NAME_BASE}-ubi8
 IMG ?= seldonio/${IMAGE_NAME_BASE}:${VERSION}
 IMG_REDHAT ?= seldonio/${IMAGE_NAME_BASE_REDHAT}:${VERSION}
 
-ENVTEST_K8S_VERSION = 1.24
+ENVTEST_K8S_VERSION = 1.28
 KIND_NAME ?= kind
 
 # For labeling the operator Docker image(s)
@@ -49,7 +49,7 @@ lint: licenses/dep.txt
 # Run tests
 test: install-ginkgo generate fmt vet manifests_all generate-resources envtest
 	ACK_GINKGO_RC=true \
-	ACK_GINKGO_DEPRECATIONS=1.16.4 \
+	ACK_GINKGO_DEPRECATIONS=1.16.5 \
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -r -outputdir=. -cover -coverprofile=cover.out ./controllers ./utils ./apis
 
 # Build manager binary
@@ -206,13 +206,13 @@ kind-image-install-redhat: docker-build-redhat
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 .PHONY: controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.2)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.15.0)
 
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 .PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20221206203637-3da2de04734a)
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.18)
 
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
@@ -232,7 +232,7 @@ endef
 .PHONY: install-ginkgo
 install-ginkgo:
 ifeq (, $(shell command -v ginkgo))
-	go install github.com/onsi/ginkgo/ginkgo@v1.16.4
+	go install github.com/onsi/ginkgo/ginkgo@v1.16.5
 
 GINKGO=$(GOBIN)/ginkgo
 else
