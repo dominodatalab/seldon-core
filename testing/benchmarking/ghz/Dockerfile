@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.13 as builder
+FROM golang:1.23 as builder
 
 ARG GHZ_VERSION
 RUN git clone -b ${GHZ_VERSION} https://github.com/bojand/ghz && \
