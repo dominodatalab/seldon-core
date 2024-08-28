@@ -1,4 +1,4 @@
-FROM openjdk:13.0.1-jdk-buster
+FROM openjdk:13.0.2-jdk-buster
 
 ENV PYTHON_VERSION "3.7.11"
 
