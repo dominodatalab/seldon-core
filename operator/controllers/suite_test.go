@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	autoscaling "k8s.io/api/autoscaling/v2"
 	"os"
@@ -241,6 +242,29 @@ var _ = BeforeSuite(func(done Done) {
 
 	Expect(k8sClient.Create(context.TODO(), configMap)).NotTo(HaveOccurred())
 	//	defer k8sClient.Delete(context.TODO(), configMap)
+
+	// Create minimal seldon-config for MLServer tests
+	mlserverConfig := map[string]map[string]interface{}{
+		"SKLEARN_SERVER": {
+			"image":               "seldonio/mlserver",
+			"env":                 []interface{}{},
+			"defaultImageVersion": "0.1.0",
+		},
+	}
+	jsonBytes, err := json.Marshal(mlserverConfig)
+	Expect(err).ToNot(HaveOccurred())
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "seldon-config",
+			Namespace: "default",
+		},
+		Data: map[string]string{
+			"prepackagedServerConfigs": string(jsonBytes),
+		},
+	}
+	err = k8sClient.Create(context.Background(), cm)
+	Expect(err).ToNot(HaveOccurred())
 
 	machinelearningv1.C = k8sClient
 
