@@ -45,7 +45,7 @@ github.com/alecthomas/kingpin/v2
 github.com/alecthomas/template
 github.com/alecthomas/units
 github.com/andybalholm/brotli
-github.com/antlr/antlr4/runtime/Go/antlr
+github.com/antlr/antlr4/runtime/Go/antlr/v4
 github.com/apache/thrift
 github.com/armon/go-metrics
 github.com/armon/go-radix
@@ -79,7 +79,6 @@ github.com/dgrijalva/jwt-go
 github.com/dgryski/go-gk
 github.com/dgryski/go-rendezvous
 github.com/dimchansky/utfbom
-github.com/docopt/docopt-go
 github.com/dustin/go-humanize
 github.com/dysnix/predictkube-libs
 github.com/dysnix/predictkube-proto
@@ -135,6 +134,7 @@ github.com/golang/snappy
 github.com/google/btree
 github.com/google/cel-go
 github.com/google/gnostic
+github.com/google/gnostic-models
 github.com/google/go-cmp
 github.com/google/go-github/v27
 github.com/google/go-querystring
@@ -303,7 +303,6 @@ go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/otel
 go.opentelemetry.io/otel/exporters/otlp
-go.opentelemetry.io/otel/exporters/otlp/internal/retry
 go.opentelemetry.io/otel/exporters/otlp/otlptrace
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
 go.opentelemetry.io/otel/metric
