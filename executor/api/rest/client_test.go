@@ -338,7 +338,11 @@ func TestTimeout(t *testing.T) {
 	err = jsonpb.UnmarshalString(string(data), &smRes)
 	g.Expect(err).Should(BeNil())
 	g.Expect(smRes.GetStatus().GetCode()).Should(BeEquivalentTo(int32(500)))
-	g.Expect(smRes.GetStatus().GetInfo()).Should(ContainSubstring("Client.Timeout exceeded while awaiting headers"))
+	info := smRes.GetStatus().GetInfo()
+	g.Expect(info).Should(Or(
+		ContainSubstring("context deadline exceeded"),
+		ContainSubstring("Client.Timeout exceeded while awaiting headers"),
+	))
 }
 
 func TestMarshall(t *testing.T) {
