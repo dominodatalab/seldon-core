@@ -123,7 +123,7 @@ func (c *connection) connect() error {
 		err = c.channel.Qos(
 			1,
 			0,
-			true,
+			false,
 		)
 		if err != nil {
 			c.log.Error(err, "error setting rabbitmq Qos")
