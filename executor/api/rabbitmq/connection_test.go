@@ -58,7 +58,7 @@ func TestNewConnection(t *testing.T) {
 
 	t.Run("connect", func(t *testing.T) {
 		f, reset := setupConnect(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
-			channel.On("Qos", 1, 0, true).Return(nil)
+			channel.On("Qos", 1, 0, false).Return(nil)
 			conn.On("Channel").Return(channel, nil)
 			adapter.On("Dial", uri).Return(conn, nil)
 		})
@@ -77,7 +77,7 @@ func TestNewConnection(t *testing.T) {
 
 	t.Run("reconnect", func(t *testing.T) {
 		f, reset := setupConnect(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
-			channel.On("Qos", 1, 0, true).Return(nil)
+			channel.On("Qos", 1, 0, false).Return(nil)
 			conn.On("Channel").Return(channel, nil)
 			adapter.On("Dial", uri).Return(nil, errors.New("test dial error")).Once()
 			adapter.On("Dial", uri).Return(conn, nil).Once()
