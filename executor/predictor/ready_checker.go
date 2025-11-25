@@ -34,7 +34,8 @@ func ReadyTCP(node *v1.PredictiveUnit) error {
 		}
 	}
 	if node.Endpoint != nil && node.Endpoint.ServiceHost != "" && node.Endpoint.ServicePort > 0 {
-		c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", node.Endpoint.ServiceHost, node.Endpoint.ServicePort))
+		address := net.JoinHostPort(node.Endpoint.ServiceHost, strconv.Itoa(int(node.Endpoint.ServicePort)))
+		c, err := net.Dial("tcp", address)
 		if err != nil {
 			return err
 		} else {
@@ -64,7 +65,8 @@ func ReadyHealth(node *v1.PredictiveUnit, healthPath string) error {
 			return err
 		} else {
 			if res.StatusCode != http.StatusOK {
-				return fmt.Errorf("Bad status from %s:%d", node.Endpoint.ServiceHost, node.Endpoint.ServicePort)
+				address := net.JoinHostPort(node.Endpoint.ServiceHost, strconv.Itoa(int(node.Endpoint.ServicePort)))
+				return fmt.Errorf("Bad status from %s", address)
 			}
 			return nil
 		}
