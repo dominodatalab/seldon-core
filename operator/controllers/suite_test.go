@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	autoscaling "k8s.io/api/autoscaling/v2"
 	"os"
@@ -243,31 +242,9 @@ var _ = BeforeSuite(func(done Done) {
 
 	Expect(k8sClient.Create(context.TODO(), configMap)).NotTo(HaveOccurred())
 	//	defer k8sClient.Delete(context.TODO(), configMap)
-
-	// Create minimal seldon-config for MLServer tests
-	mlserverConfig := map[string]map[string]interface{}{
-		"SKLEARN_SERVER": {
-			"image":               "seldonio/mlserver",
-			"env":                 []interface{}{},
-			"defaultImageVersion": "0.1.0",
-		},
-	}
-	jsonBytes, err := json.Marshal(mlserverConfig)
-	Expect(err).ToNot(HaveOccurred())
-
-	// Create ConfigMap in the ControllerNamespace (defaults to "seldon-system")
-	// This is where GetPrepackServerConfig looks for it
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "seldon-config",
-			Namespace: machinelearningv1.ControllerNamespace,
-		},
-		Data: map[string]string{
-			"prepackagedServerConfigs": string(jsonBytes),
-		},
-	}
-	err = k8sClient.Create(context.Background(), cm)
-	Expect(err).ToNot(HaveOccurred())
+	// Note: The existing configMap already has SKLEARN_SERVER with "v2" protocol (MLServer)
+	// in the "predictor_servers" key, which is what getMLServerImage() reads from.
+	// No additional config is needed.
 
 	machinelearningv1.C = k8sClient
 
