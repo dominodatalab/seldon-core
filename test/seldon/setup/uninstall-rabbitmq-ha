@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Uninstall RabbitMQ installed via rabbitmq-ha Helm chart
+
+set -o nounset -o errexit -o pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+echo ">>> Deleting seldon user secrets..."
+kubectl delete -f "${SCRIPT_DIR}/manifests/rabbitmq/seldon-user-secret.yaml" --ignore-not-found=true || true
+
+echo ">>> Uninstalling rabbitmq-ha chart..."
+helm uninstall rabbitmq-ha -n rabbitmq --ignore-not-found || true
+
+echo ">>> Deleting namespace..."
+kubectl delete namespace rabbitmq --ignore-not-found=true
+
+echo ">>> Done removing RabbitMQ (rabbitmq-ha chart)."
+

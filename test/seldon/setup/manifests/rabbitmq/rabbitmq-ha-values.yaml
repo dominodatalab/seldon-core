@@ -1,0 +1,54 @@
+# Helm values for rabbitmq-ha chart in test environment
+# Uses production chart but with minimal resources for testing
+
+replicaCount: 1
+
+# Minimal resources for test environment
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# RabbitMQ configuration
+rabbitmqUsername: rabbitmq
+rabbitmqPassword: rabbitmq  # Simple password for tests
+rabbitmqErlangCookie: test-cookie
+
+# Advanced config matching operator setup
+advancedConfig: |
+  log.console.level = info
+  channel_max = 1500
+
+# User definitions - seldon user will be created via secret + definitions
+definitions:
+  users:
+    - username: seldon
+      secret: rabbitmq-ha.seldon
+      tags: []
+  permissions:
+    - user: seldon
+      vhost: "/"
+      configure: ".*"
+      write: ".*"
+      read: ".*"
+  vhosts:
+    - name: "/"
+
+# Disable persistence for faster tests (optional - can enable if needed)
+persistentVolume:
+  enabled: false
+
+# Pod management
+podManagementPolicy: Parallel
+
+# Prometheus plugin (if needed for monitoring)
+rabbitmqPrometheusPlugin:
+  enabled: true
+

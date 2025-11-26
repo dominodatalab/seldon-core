@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Install RabbitMQ using production rabbitmq-ha Helm chart
+# This replaces the operator-based installation
+
+set -o nounset -o errexit -o pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+echo ">>> Creating namespace..."
+kubectl create namespace rabbitmq --dry-run=client -o yaml | kubectl apply -f -
+
+# Note: seldon-regression-test namespace should already exist from install-test-namespace
+# (called before this script in install-all). If running standalone, ensure it exists first.
+
+echo ">>> Creating seldon user secret..."
+kubectl apply -f "${SCRIPT_DIR}/manifests/rabbitmq/seldon-user-secret.yaml"
+
+echo ">>> Installing rabbitmq-ha chart..."
+# Install from OCI registry
+helm upgrade --install rabbitmq-ha \
+  oci://gcr.io/domino-eng-service-artifacts/rabbitmq-ha \
+  --version 2.2.0-r13 \
+  --namespace rabbitmq \
+  --values "${SCRIPT_DIR}/manifests/rabbitmq/rabbitmq-ha-values.yaml" \
+  --wait \
+  --timeout 5m
+
+echo ">>> Waiting for RabbitMQ pod to be ready..."
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
+  --timeout=300s -n rabbitmq || {
+    echo "Warning: RabbitMQ pod not ready, checking status..."
+    kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
+    exit 1
+  }
+
+echo ">>> Creating RabbitMQ queues..."
+"${SCRIPT_DIR}/create-rabbitmq-queues.sh"
+
+echo ">>> Verifying RabbitMQ service..."
+kubectl get svc rabbitmq-ha -n rabbitmq
+
+echo ">>> Done installing RabbitMQ (rabbitmq-ha chart)."
+
