@@ -16,6 +16,19 @@ kubectl create namespace rabbitmq --dry-run=client -o yaml | kubectl apply -f -
 echo ">>> Creating seldon user secret..."
 kubectl apply -f "${SCRIPT_DIR}/manifests/rabbitmq/seldon-user-secret.yaml"
 
+echo ">>> Authenticating with GCR for Helm chart access..."
+# Authenticate with GCR if credentials are available
+# GCR_PASSWORD should be a base64-encoded JSON key
+if [ -n "${GCR_PASSWORD:-}" ]; then
+  echo "$GCR_PASSWORD" | base64 --decode | helm registry login -u _json_key --password-stdin gcr.io
+elif [ -n "${GCR_HELM_KEY_BASE64:-}" ]; then
+  # Alternative: GCR_HELM_KEY_BASE64 (used in CircleCI)
+  echo "$GCR_HELM_KEY_BASE64" | base64 --decode | helm registry login -u _json_key --password-stdin gcr.io
+else
+  echo "Warning: GCR_PASSWORD or GCR_HELM_KEY_BASE64 not set. Attempting to use existing Helm credentials..."
+  echo "If this fails, set GCR_PASSWORD (base64-encoded JSON key) or GCR_HELM_KEY_BASE64 environment variable."
+fi
+
 echo ">>> Installing rabbitmq-ha chart..."
 # Install from OCI registry
 helm upgrade --install rabbitmq-ha \
