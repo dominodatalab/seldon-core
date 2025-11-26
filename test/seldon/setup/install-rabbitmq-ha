@@ -31,17 +31,24 @@ fi
 
 echo ">>> Installing rabbitmq-ha chart..."
 # Install from OCI registry
-helm upgrade --install rabbitmq-ha \
+# Note: Not using --wait as it can timeout; we'll check pod readiness manually instead
+if ! helm upgrade --install rabbitmq-ha \
   oci://gcr.io/domino-eng-service-artifacts/rabbitmq-ha \
   --version 2.2.0-r13 \
   --namespace rabbitmq \
-  --values "${SCRIPT_DIR}/manifests/rabbitmq/rabbitmq-ha-values.yaml" \
-  --wait \
-  --timeout 5m
+  --values "${SCRIPT_DIR}/manifests/rabbitmq/rabbitmq-ha-values.yaml"; then
+  echo "ERROR: Helm install failed"
+  kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
+  kubectl get statefulset -n rabbitmq || true
+  exit 1
+fi
+
+echo ">>> Chart installed, waiting for resources to be created..."
+sleep 10
 
 echo ">>> Waiting for RabbitMQ pod to be ready..."
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
-  --timeout=300s -n rabbitmq || {
+  --timeout=600s -n rabbitmq || {
     echo "Warning: RabbitMQ pod not ready, checking status..."
     kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
     exit 1
