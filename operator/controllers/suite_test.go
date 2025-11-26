@@ -37,6 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -254,10 +255,12 @@ var _ = BeforeSuite(func(done Done) {
 	jsonBytes, err := json.Marshal(mlserverConfig)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Create ConfigMap in the ControllerNamespace (defaults to "seldon-system")
+	// This is where GetPrepackServerConfig looks for it
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "seldon-config",
-			Namespace: "default",
+			Namespace: machinelearningv1.ControllerNamespace,
 		},
 		Data: map[string]string{
 			"prepackagedServerConfigs": string(jsonBytes),
@@ -280,6 +283,33 @@ var _ = BeforeSuite(func(done Done) {
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
 		Expect(err).ToNot(HaveOccurred())
 	}()
+
+	// Wait for cache to be ready by attempting to read from it
+	// This ensures the cache is started before tests run
+	By("waiting for cache to be ready")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cacheReady := false
+	for !cacheReady {
+		select {
+		case <-ctx.Done():
+			Fail("timeout waiting for cache to be ready")
+		default:
+			// Try to read the ConfigMap to verify cache is ready
+			testConfigMap := &corev1.ConfigMap{}
+			err := k8sClient.Get(context.TODO(), k8types.NamespacedName{
+				Name:      "seldon-config",
+				Namespace: machinelearningv1.ControllerNamespace,
+			}, testConfigMap)
+			if err == nil {
+				// Cache is ready
+				cacheReady = true
+			} else {
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}
 
 	close(done)
 }, 60)

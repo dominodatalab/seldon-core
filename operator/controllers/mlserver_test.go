@@ -46,7 +46,11 @@ var _ = Describe("MLServer helpers", func() {
 				},
 			}
 
-			mlServer, _ = getMLServerContainer(pu, "default")
+			// Cache should be ready from BeforeSuite, but add error checking
+			var err error
+			mlServer, err = getMLServerContainer(pu, "default")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mlServer).ToNot(BeNil())
 		})
 
 		It("should merge containers adding extra env", func() {
