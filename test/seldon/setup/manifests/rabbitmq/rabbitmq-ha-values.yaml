@@ -3,6 +3,11 @@
 
 replicaCount: 1
 
+# Image pull secrets for private registry
+image:
+  pullSecrets:
+    - domino-quay-repos
+
 # Minimal resources for test environment
 resources:
   limits:
