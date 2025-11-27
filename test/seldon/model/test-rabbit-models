@@ -9,22 +9,60 @@ COMMON_DIR=$SCRIPT_DIR/../common
 source "${COMMON_DIR}/with_backoff.sh"
 
 COMPUTE_NAMESPACE=seldon-regression-test
+RABBITMQ_NAMESPACE=rabbitmq
 
-RABBITMQ_USER=$(kubectl -n rabbitmq get secret rabbitmq-cluster-default-user -o jsonpath="{.data.username}" | base64 --decode)
-RABBITMQ_PASSWORD=$(kubectl -n rabbitmq get secret rabbitmq-cluster-default-user -o jsonpath="{.data.password}" | base64 --decode)
+echo ">>> Getting RabbitMQ credentials..."
+# Chart creates main secret 'rabbitmq-ha' with default user password
+# Default username comes from values (rabbitmqUsername: rabbitmq)
+# Default password is in secret 'rabbitmq-ha' with key 'rabbitmq-password'
+# For management API, we can use default user (rabbitmq) or seldon user
+RABBITMQ_USER="rabbitmq"  # Default from values.yaml
+RABBITMQ_PASSWORD=""
+
+# Try to get default user password from chart's main secret
+if kubectl get secret rabbitmq-ha -n ${RABBITMQ_NAMESPACE} &>/dev/null; then
+  RABBITMQ_PASSWORD=$(kubectl -n ${RABBITMQ_NAMESPACE} get secret rabbitmq-ha -o jsonpath="{.data.rabbitmq-password}" | base64 --decode 2>/dev/null || echo "")
+fi
+
+# Fallback to seldon user if default password not found
+if [ -z "$RABBITMQ_PASSWORD" ]; then
+  RABBITMQ_USER="seldon"
+  if kubectl get secret rabbitmq-ha.seldon -n ${RABBITMQ_NAMESPACE} &>/dev/null; then
+    RABBITMQ_PASSWORD=$(kubectl -n ${RABBITMQ_NAMESPACE} get secret rabbitmq-ha.seldon -o jsonpath="{.data.rabbitmq-password}" | base64 --decode 2>/dev/null || echo "seldon-password")
+  else
+    RABBITMQ_PASSWORD="seldon-password"
+  fi
+fi
+
+if [ -z "$RABBITMQ_USER" ] || [ -z "$RABBITMQ_PASSWORD" ]; then
+  echo "ERROR: Could not determine RabbitMQ credentials"
+  exit 1
+fi
+
+echo ">>> Getting RabbitMQ pod name..."
+RABBITMQ_POD=$(kubectl get pods -n ${RABBITMQ_NAMESPACE} -l app.kubernetes.io/name=rabbitmq-ha -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+if [ -z "$RABBITMQ_POD" ]; then
+  echo "ERROR: RabbitMQ pod not found"
+  exit 1
+fi
+
 EXPECTED_IRIS_RESULT_PAYLOAD='{"data":{"names":["t:0","t:1","t:2"],"ndarray":[[0.0006985194531162835,0.00366803903943666,0.995633441507447]]},"meta":{"requestPath":{"classifier":"seldonio/sklearnserver:1.17.1"}}}'
 
 echo ">>> Sending predict message to iris rabbitmq model input queue..."
-kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-    curl -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
+# Use port-forward to access Management API since curl is not available in container
+kubectl -n ${RABBITMQ_NAMESPACE} port-forward ${RABBITMQ_POD} 15672:15672 > /dev/null 2>&1 &
+PORT_FORWARD_PID=$!
+sleep 2
+
+curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     -H "Content-type: application/json" \
     -H "Accept: application/json" \
     -d '{"properties":{"content_type":"application/json"},"routing_key":"iris-model-rabbitmq-input","payload":"{\"data\": {\"ndarray\": [[1,2,3,4]] }}","payload_encoding":"string"}'
 
 function retrieveIrisResult {
-  IRIS_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-      curl -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
+  IRIS_RESULT_PAYLOAD=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
       --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
       -H "Content-type: application/json" \
       -H "Accept: application/json" \
@@ -34,34 +72,12 @@ with_backoff retrieveIrisResult
 
 if [ "${EXPECTED_IRIS_RESULT_PAYLOAD}" != "${IRIS_RESULT_PAYLOAD}" ]; then
   echo "UNEXPECTED IRIS MODEL RESULT: ${IRIS_RESULT_PAYLOAD}"
+  kill $PORT_FORWARD_PID 2>/dev/null || true
   exit 1
 fi
 
-#
-# Tensorflow model does not work as our RabbitMQ server only accepts payloads in Seldon format, not raw tensorflow
-#
-#EXPECTED_CIFAR10_RESULT_PAYLOAD='1.45e-08,1.25e-09,1.63e-07,1.15e-01,1.74e-07,6.19e-06,8.85e-01,6.07e-09,7.44e-08,4.73e-09,'
-#CIFAR10_REQUEST_PAYLOAD="$(<$MODELS_DIR/cifar10_tensorflow_single.json)"
-#echo ">>> Sending predict message to cifar10 rabbitmq model input queue..."
-#kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-#    curl -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
-#    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-#    -H "Content-type: application/json" \
-#    -H "Accept: application/json" \
-#    -d "${CIFAR10_REQUEST_PAYLOAD}"
-#
-#function retrieveCifar10Result {
-#  CIFAR10_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-#      curl -X POST "http://localhost:15672/api/queues/%2F/cifar10-rest-output/get" \
-#      --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-#      -H "Content-type: application/json" \
-#      -H "Accept: application/json" \
-#      -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}' | \
-#      jq -e -r '.[0].payload' | jq -r '.predictions[0][]' | xargs -I{} printf "%.2e," "{}")
-#}
-#with_backoff retrieveCifar10Result
-#
-#if [ "${EXPECTED_CIFAR10_RESULT_PAYLOAD}" != "${CIFAR10_RESULT_PAYLOAD}" ]; then
-#  echo "UNEXPECTED CIFAR10 MODEL RESULT: ${CIFAR10_RESULT_PAYLOAD}"
-#  exit 1
-#fi
+# Clean up port-forward
+kill $PORT_FORWARD_PID 2>/dev/null || true
+wait $PORT_FORWARD_PID 2>/dev/null || true
+
+echo ">>> Test passed!"
