@@ -47,6 +47,7 @@ definitions:
     - name: "/"
     - name: "data-plane-service"
   queues:
+    # Test queues
     - name: "iris-model-rabbitmq-input"
       vhost: "/"
       auto_delete: false
@@ -67,6 +68,28 @@ definitions:
       auto_delete: false
       durable: true
       arguments: {}
+    # Required by chart's default bindings
+    - name: "request.alt.1"
+      vhost: "data-plane-service"
+      auto_delete: false
+      durable: true
+      arguments:
+        x-queue-type: "quorum"
+        x-quorum-initial-group-size: 3
+  exchanges:
+    # Required by chart's default bindings
+    - name: "request.alt.1"
+      vhost: "data-plane-service"
+      type: "fanout"
+      durable: true
+      auto_delete: false
+      internal: false
+  bindings:
+    # Required binding from chart defaults
+    - source: "request.alt.1"
+      vhost: "data-plane-service"
+      destination: "request.alt.1"
+      destination_type: "queue"
 
 # Disable persistence for faster tests (optional - can enable if needed)
 persistentVolume:
