@@ -278,19 +278,74 @@ if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown
       
       # Get recent logs for RabbitMQ-related errors
       echo "  Checking logs for RabbitMQ connection issues..." >&2
-      if kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=50 2>&1 | grep -i -E "(rabbitmq|amqp|connection|error|failed)" >&2; then
-        echo "  ^ Found RabbitMQ-related log entries above" >&2
+      LOG_OUTPUT=$(kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=100 2>&1 || echo "")
+      if echo "$LOG_OUTPUT" | grep -i -E "(rabbitmq|amqp|connection|error|failed|exception|traceback)" >&2; then
+        echo "  ^ Found RabbitMQ/error-related log entries above" >&2
       else
         echo "  (No obvious RabbitMQ errors in recent logs)" >&2
+        # Show last few lines of logs anyway for context
+        echo "  Last 10 lines of logs:" >&2
+        echo "$LOG_OUTPUT" | tail -10 | sed 's/^/    /' >&2
       fi
       
-      # Check environment variables
+      # Check environment variables - look for the specific RabbitMQ config vars
+      # Note: With serverType=rabbitmq, env vars in svcOrchSpec should be on the orchestrator container, not classifier
       echo "  Checking RabbitMQ environment variables..." >&2
-      if kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c classifier -- env 2>&1 | grep RABBITMQ >&2; then
-        echo "  ^ RabbitMQ env vars found above" >&2
-      else
-        echo "  ERROR: No RABBITMQ environment variables found in pod $pod" >&2
+      
+      # First check classifier container (model container)
+      RABBITMQ_ENV_CLASSIFIER=$(kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c classifier -- env 2>&1 | grep -E "^RABBITMQ_(BROKER_URL|USERNAME|PASSWORD|INPUT_QUEUE|OUTPUT_QUEUE)=" || echo "")
+      
+      # Check if there's an orchestrator container (for serverType=rabbitmq)
+      ORCHESTRATOR_CONTAINER=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.spec.containers[*].name}' 2>/dev/null | grep -oE '\borchestrator\b' || echo "")
+      
+      if [ -n "$ORCHESTRATOR_CONTAINER" ]; then
+        echo "  Found orchestrator container, checking it for RabbitMQ env vars..." >&2
+        RABBITMQ_ENV_ORCH=$(kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c $ORCHESTRATOR_CONTAINER -- env 2>&1 | grep -E "^RABBITMQ_(BROKER_URL|USERNAME|PASSWORD|INPUT_QUEUE|OUTPUT_QUEUE)=" || echo "")
+        if [ -n "$RABBITMQ_ENV_ORCH" ]; then
+          echo "  Found RabbitMQ configuration in orchestrator container:" >&2
+          echo "$RABBITMQ_ENV_ORCH" | sed 's/^/    /' >&2
+          RABBITMQ_ENV="$RABBITMQ_ENV_ORCH"
+        fi
+      fi
+      
+      if [ -z "$RABBITMQ_ENV" ] && [ -n "$RABBITMQ_ENV_CLASSIFIER" ]; then
+        echo "  Found RabbitMQ configuration in classifier container:" >&2
+        echo "$RABBITMQ_ENV_CLASSIFIER" | sed 's/^/    /' >&2
+        RABBITMQ_ENV="$RABBITMQ_ENV_CLASSIFIER"
+      fi
+      
+      if [ -z "$RABBITMQ_ENV" ]; then
+        echo "  ERROR: Required RabbitMQ environment variables not found in any container" >&2
+        echo "  Expected: RABBITMQ_BROKER_URL, RABBITMQ_USERNAME, RABBITMQ_PASSWORD, RABBITMQ_INPUT_QUEUE, RABBITMQ_OUTPUT_QUEUE" >&2
+        echo "  Note: With serverType=rabbitmq, these should be in svcOrchSpec.env and applied to the orchestrator container" >&2
         DIAGNOSTIC_FAILED=true
+      else
+        # Verify all required vars are present
+        if ! echo "$RABBITMQ_ENV" | grep -q "RABBITMQ_BROKER_URL="; then
+          echo "  ERROR: RABBITMQ_BROKER_URL not set" >&2
+          DIAGNOSTIC_FAILED=true
+        fi
+        if ! echo "$RABBITMQ_ENV" | grep -q "RABBITMQ_USERNAME="; then
+          echo "  ERROR: RABBITMQ_USERNAME not set" >&2
+          DIAGNOSTIC_FAILED=true
+        fi
+        if ! echo "$RABBITMQ_ENV" | grep -q "RABBITMQ_PASSWORD="; then
+          echo "  ERROR: RABBITMQ_PASSWORD not set" >&2
+          DIAGNOSTIC_FAILED=true
+        fi
+      fi
+      
+      # Check why pod is not ready
+      if [ "$POD_READY" != "True" ]; then
+        echo "  Pod is not ready. Checking readiness conditions..." >&2
+        kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")]}' 2>&1 | jq -r 'if type=="array" then .[] | "    \(.type): \(.status) - \(.reason // "no reason") - \(.message // "no message")" else . end' >&2 || true
+        # Check container status
+        CONTAINER_READY=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.containerStatuses[?(@.name=="classifier")].ready}' 2>/dev/null || echo "unknown")
+        CONTAINER_RESTART_COUNT=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.containerStatuses[?(@.name=="classifier")].restartCount}' 2>/dev/null || echo "unknown")
+        echo "    Container ready: $CONTAINER_READY, restart count: $CONTAINER_RESTART_COUNT" >&2
+        if [ "$CONTAINER_RESTART_COUNT" != "0" ] && [ "$CONTAINER_RESTART_COUNT" != "unknown" ]; then
+          echo "    WARNING: Container has restarted $CONTAINER_RESTART_COUNT times - may indicate startup failures" >&2
+        fi
       fi
     done
   fi
