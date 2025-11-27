@@ -75,7 +75,7 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
 
       echo ""
       echo ">>> Pod logs (main container):"
-      kubectl logs -n rabbitmq "$RABBITMQ_POD" || true
+      kubectl logs -n rabbitmq "$RABBITMQ_POD" --tail=100 || true
 
       # Check for init containers
       INIT_CONTAINERS=$(kubectl get pod -n rabbitmq "$RABBITMQ_POD" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null || echo "")
@@ -83,7 +83,7 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
         for INIT_CONTAINER in $INIT_CONTAINERS; do
           echo ""
           echo ">>> Pod logs (init container: $INIT_CONTAINER):"
-          kubectl logs -n rabbitmq "$RABBITMQ_POD" -c "$INIT_CONTAINER" || true
+          kubectl logs -n rabbitmq "$RABBITMQ_POD" -c "$INIT_CONTAINER" --tail=100 || true
         done
       fi
     else
@@ -94,9 +94,6 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
 
     exit 1
   }
-
-echo ">>> Creating RabbitMQ queues..."
-"${SCRIPT_DIR}/create-rabbitmq-queues.sh"
 
 echo ">>> Verifying RabbitMQ service..."
 kubectl get svc rabbitmq-ha -n rabbitmq

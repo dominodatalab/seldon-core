@@ -46,6 +46,27 @@ definitions:
   vhosts:
     - name: "/"
     - name: "data-plane-service"
+  queues:
+    - name: "iris-model-rabbitmq-input"
+      vhost: "/"
+      auto_delete: false
+      durable: true
+      arguments: {}
+    - name: "iris-model-rabbitmq-output"
+      vhost: "/"
+      auto_delete: false
+      durable: true
+      arguments: {}
+    - name: "cifar10-rest-input"
+      vhost: "/"
+      auto_delete: false
+      durable: true
+      arguments: {}
+    - name: "cifar10-rest-output"
+      vhost: "/"
+      auto_delete: false
+      durable: true
+      arguments: {}
 
 # Disable persistence for faster tests (optional - can enable if needed)
 persistentVolume:
