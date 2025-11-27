@@ -298,17 +298,38 @@ if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown
       # First check classifier container (model container)
       RABBITMQ_ENV_CLASSIFIER=$(kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c classifier -- env 2>&1 | grep -E "^RABBITMQ_(BROKER_URL|USERNAME|PASSWORD|INPUT_QUEUE|OUTPUT_QUEUE)=" || echo "")
       
+      # List all containers in the pod
+      ALL_CONTAINERS=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || echo "")
+      echo "  All containers in pod: $ALL_CONTAINERS" >&2
+      
       # Check if there's an orchestrator container (for serverType=rabbitmq)
-      ORCHESTRATOR_CONTAINER=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.spec.containers[*].name}' 2>/dev/null | grep -oE '\borchestrator\b' || echo "")
+      # Seldon Core uses "seldon-container-engine" as the orchestrator container name
+      ORCHESTRATOR_CONTAINER=$(echo "$ALL_CONTAINERS" | grep -oE '\b(seldon-container-engine|orchestrator)\b' || echo "")
       
       if [ -n "$ORCHESTRATOR_CONTAINER" ]; then
-        echo "  Found orchestrator container, checking it for RabbitMQ env vars..." >&2
+        echo "  Found orchestrator container ($ORCHESTRATOR_CONTAINER), checking it for RabbitMQ env vars..." >&2
+        # Check orchestrator container status
+        ORCH_READY=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.containerStatuses[?(@.name=="'$ORCHESTRATOR_CONTAINER'")].ready}' 2>/dev/null || echo "unknown")
+        ORCH_RESTARTS=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.containerStatuses[?(@.name=="'$ORCHESTRATOR_CONTAINER'")].restartCount}' 2>/dev/null || echo "unknown")
+        echo "    Orchestrator container status: ready=$ORCH_READY, restarts=$ORCH_RESTARTS" >&2
+        
+        # Try to get env vars (may fail if container isn't ready)
         RABBITMQ_ENV_ORCH=$(kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c $ORCHESTRATOR_CONTAINER -- env 2>&1 | grep -E "^RABBITMQ_(BROKER_URL|USERNAME|PASSWORD|INPUT_QUEUE|OUTPUT_QUEUE)=" || echo "")
         if [ -n "$RABBITMQ_ENV_ORCH" ]; then
           echo "  Found RabbitMQ configuration in orchestrator container:" >&2
           echo "$RABBITMQ_ENV_ORCH" | sed 's/^/    /' >&2
           RABBITMQ_ENV="$RABBITMQ_ENV_ORCH"
+        else
+          echo "  No RabbitMQ env vars found in orchestrator container" >&2
+          # Get orchestrator logs to see if there are connection errors
+          echo "  Checking orchestrator container logs..." >&2
+          ORCH_LOGS=$(kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c $ORCHESTRATOR_CONTAINER --tail=30 2>&1 || echo "Could not retrieve logs")
+          if echo "$ORCH_LOGS" | grep -i -E "(rabbitmq|amqp|error|failed|exception)" >&2; then
+            echo "  ^ Found RabbitMQ/error-related log entries above" >&2
+          fi
         fi
+      else
+        echo "  WARNING: No orchestrator container found. Expected 'seldon-container-engine' for serverType=rabbitmq" >&2
       fi
       
       if [ -z "$RABBITMQ_ENV" ] && [ -n "$RABBITMQ_ENV_CLASSIFIER" ]; then
@@ -364,6 +385,42 @@ if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown
   else
     echo "  Connection details:" >&2
     echo "$RABBITMQ_CONNECTIONS" | jq -r '.[] | "    - \(.name // "unnamed"): user=\(.user), state=\(.state)"' >&2 || true
+  fi
+  
+  # Check Seldon Core operator logs for errors processing the SeldonDeployment
+  echo ">>> Checking Seldon Core operator logs for SeldonDeployment processing errors..." >&2
+  OPERATOR_NAMESPACE=$(kubectl get deployment -A -l app.kubernetes.io/name=seldon-core-operator -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || echo "")
+  if [ -n "$OPERATOR_NAMESPACE" ]; then
+    OPERATOR_POD=$(kubectl get pods -n "$OPERATOR_NAMESPACE" -l app.kubernetes.io/name=seldon-core-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    if [ -n "$OPERATOR_POD" ]; then
+      echo "  Operator pod: $OPERATOR_POD in namespace $OPERATOR_NAMESPACE" >&2
+      # Look for errors related to the iris-model-rabbitmq deployment
+      OPERATOR_LOGS=$(kubectl logs "$OPERATOR_POD" -n "$OPERATOR_NAMESPACE" --tail=100 2>&1 | grep -i -E "(iris-model-rabbitmq|svcOrchSpec|rabbitmq|error|failed)" || echo "")
+      if [ -n "$OPERATOR_LOGS" ]; then
+        echo "  Found relevant operator log entries:" >&2
+        echo "$OPERATOR_LOGS" | sed 's/^/    /' >&2
+      else
+        echo "  (No obvious errors in recent operator logs related to iris-model-rabbitmq)" >&2
+      fi
+    fi
+  fi
+  
+  # Check the actual SeldonDeployment resource to see if svcOrchSpec is present
+  echo ">>> Checking SeldonDeployment resource configuration..." >&2
+  SD_SPEC=$(kubectl get seldondeployment iris-model-rabbitmq -n ${COMPUTE_NAMESPACE} -o json 2>/dev/null || echo "{}")
+  if echo "$SD_SPEC" | jq -e '.spec.predictors[0].svcOrchSpec' > /dev/null 2>&1; then
+    SVC_ORCH_ENV=$(echo "$SD_SPEC" | jq -r '.spec.predictors[0].svcOrchSpec.env // []' 2>/dev/null || echo "[]")
+    if echo "$SVC_ORCH_ENV" | jq -e 'length > 0' > /dev/null 2>&1; then
+      echo "  ✓ svcOrchSpec.env is present in SeldonDeployment with $(echo "$SVC_ORCH_ENV" | jq 'length') env vars" >&2
+      echo "  Env vars in svcOrchSpec:" >&2
+      echo "$SVC_ORCH_ENV" | jq -r '.[] | "    - \(.name): \(if .value then .value else "from secret" end)"' >&2 || true
+    else
+      echo "  ERROR: svcOrchSpec.env is empty or missing in SeldonDeployment" >&2
+      DIAGNOSTIC_FAILED=true
+    fi
+  else
+    echo "  ERROR: svcOrchSpec is missing from SeldonDeployment" >&2
+    DIAGNOSTIC_FAILED=true
   fi
   
   if [ "$DIAGNOSTIC_FAILED" = "true" ]; then
