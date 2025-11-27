@@ -292,6 +292,9 @@ if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown
       # Note: With serverType=rabbitmq, env vars in svcOrchSpec should be on the orchestrator container, not classifier
       echo "  Checking RabbitMQ environment variables..." >&2
       
+      # Initialize to empty string to avoid unbound variable error
+      RABBITMQ_ENV=""
+      
       # First check classifier container (model container)
       RABBITMQ_ENV_CLASSIFIER=$(kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c classifier -- env 2>&1 | grep -E "^RABBITMQ_(BROKER_URL|USERNAME|PASSWORD|INPUT_QUEUE|OUTPUT_QUEUE)=" || echo "")
       
