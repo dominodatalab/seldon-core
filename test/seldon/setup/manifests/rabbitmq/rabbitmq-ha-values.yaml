@@ -26,12 +26,12 @@ rabbitmqUsername: rabbitmq
 rabbitmqPassword: rabbitmq  # Simple password for tests
 rabbitmqErlangCookie: test-cookie
 
-# Advanced config matching operator setup
-advancedConfig: |
+# Extra config matching operator setup (rabbitmq.conf settings)
+extraConfig: |
   log.console.level = info
   channel_max = 1500
 
-# User definitions - seldon user will be created via secret + definitions
+# Definitions for RabbitMQ objects loaded at startup
 definitions:
   users:
     - username: seldon
@@ -56,4 +56,3 @@ podManagementPolicy: Parallel
 # Prometheus plugin (if needed for monitoring)
 rabbitmqPrometheusPlugin:
   enabled: true
-
