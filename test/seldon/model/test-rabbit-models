@@ -43,11 +43,36 @@ fi
 
 EXPECTED_IRIS_RESULT_PAYLOAD='{"data":{"names":["t:0","t:1","t:2"],"ndarray":[[0.0006985194531162835,0.00366803903943666,0.995633441507447]]},"meta":{"requestPath":{"classifier":"seldonio/sklearnserver:1.17.1"}}}'
 
-echo ">>> Sending predict message to iris rabbitmq model input queue..."
+echo ">>> Checking if model deployment is ready..."
+if ! kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n ${COMPUTE_NAMESPACE} --for condition=Available=True --timeout=30s 2>/dev/null; then
+  echo "WARNING: Model deployment may not be ready. Continuing anyway..."
+fi
+
+echo ">>> Setting up port-forward to RabbitMQ Management API..."
 # Use port-forward to access Management API since curl is not available in container
 kubectl -n ${RABBITMQ_NAMESPACE} port-forward ${RABBITMQ_POD} 15672:15672 > /dev/null 2>&1 &
 PORT_FORWARD_PID=$!
 sleep 2
+
+echo ">>> Verifying queues exist..."
+INPUT_QUEUE_INFO=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+OUTPUT_QUEUE_INFO=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+
+if echo "$INPUT_QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: Input queue does not exist: $INPUT_QUEUE_INFO" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+if echo "$OUTPUT_QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: Output queue does not exist: $OUTPUT_QUEUE_INFO" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+echo ">>> Queues verified. Sending predict message to iris rabbitmq model input queue..."
 
 PUBLISH_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
@@ -62,6 +87,8 @@ if echo "$PUBLISH_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
   exit 1
 fi
 
+echo ">>> Message published successfully. Waiting for model to process..."
+
 function retrieveIrisResult {
   RESPONSE=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
       --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
@@ -75,13 +102,30 @@ function retrieveIrisResult {
     return 1
   fi
   
-  # Extract payload from response array
-  IRIS_RESULT_PAYLOAD=$(echo "$RESPONSE" | jq -e -r '.[0].payload // empty')
-  
-  # Return 1 if payload is empty (queue might be empty)
-  if [ -z "$IRIS_RESULT_PAYLOAD" ]; then
+  # Check if response is an empty array (queue is empty)
+  if echo "$RESPONSE" | jq -e 'length == 0' > /dev/null 2>&1; then
+    # Queue is empty - check queue status for debugging
+    QUEUE_INFO=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output" \
+        --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+    if echo "$QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
+      echo "Queue does not exist or error accessing it: $QUEUE_INFO" >&2
+    else
+      MESSAGE_COUNT=$(echo "$QUEUE_INFO" | jq -r '.messages // 0' 2>/dev/null || echo "unknown")
+      echo "Queue is empty (messages: $MESSAGE_COUNT). Waiting for model response..." >&2
+    fi
     return 1
   fi
+  
+  # Extract payload from response array
+  IRIS_RESULT_PAYLOAD=$(echo "$RESPONSE" | jq -e -r '.[0].payload // empty' 2>/dev/null)
+  
+  # Return 1 if payload is empty
+  if [ -z "$IRIS_RESULT_PAYLOAD" ]; then
+    echo "Response received but payload is empty: $RESPONSE" >&2
+    return 1
+  fi
+  
+  return 0
 }
 with_backoff retrieveIrisResult
 
