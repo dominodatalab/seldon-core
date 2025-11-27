@@ -48,6 +48,25 @@ if ! kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n ${
   echo "WARNING: Model deployment may not be ready. Continuing anyway..."
 fi
 
+echo ">>> Verifying model secret exists..."
+if ! kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} &>/dev/null; then
+  echo "ERROR: Secret 'seldon-user-user-credentials' not found in namespace ${COMPUTE_NAMESPACE}" >&2
+  echo "This secret is required for the model to connect to RabbitMQ." >&2
+  exit 1
+fi
+
+echo ">>> Checking model pod status..."
+MODEL_PODS=$(kubectl get pods -n ${COMPUTE_NAMESPACE} -l seldon-deployment-id=iris-model-rabbitmq -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+if [ -z "$MODEL_PODS" ]; then
+  echo "WARNING: No model pods found. Model may not be deployed correctly." >&2
+else
+  echo "Model pods: $MODEL_PODS"
+  for pod in $MODEL_PODS; do
+    POD_STATUS=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    echo "  Pod $pod: $POD_STATUS"
+  done
+fi
+
 echo ">>> Setting up port-forward to RabbitMQ Management API..."
 # Use port-forward to access Management API since curl is not available in container
 kubectl -n ${RABBITMQ_NAMESPACE} port-forward ${RABBITMQ_POD} 15672:15672 > /dev/null 2>&1 &
@@ -87,7 +106,58 @@ if echo "$PUBLISH_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
   exit 1
 fi
 
-echo ">>> Message published successfully. Waiting for model to process..."
+# Verify publish response indicates success
+PUBLISH_ROUTED=$(echo "$PUBLISH_RESPONSE" | jq -r '.routed // false' 2>/dev/null)
+if [ "$PUBLISH_ROUTED" != "true" ]; then
+  echo "WARNING: Publish response indicates message may not have been routed: $PUBLISH_RESPONSE" >&2
+fi
+
+echo ">>> Message published successfully (routed: $PUBLISH_ROUTED). Verifying message reached input queue..."
+
+# Wait a moment for message to be routed to queue
+sleep 1
+
+# Check input queue to verify message arrived
+INPUT_QUEUE_BEFORE=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+INPUT_MESSAGES_BEFORE=$(echo "$INPUT_QUEUE_BEFORE" | jq -r '.messages // 0' 2>/dev/null || echo "unknown")
+INPUT_CONSUMERS_BEFORE=$(echo "$INPUT_QUEUE_BEFORE" | jq -r '.consumers // 0' 2>/dev/null || echo "unknown")
+
+echo "Input queue status: messages=$INPUT_MESSAGES_BEFORE, consumers=$INPUT_CONSUMERS_BEFORE"
+
+if [ "$INPUT_MESSAGES_BEFORE" = "0" ] || [ "$INPUT_MESSAGES_BEFORE" = "unknown" ]; then
+  echo "WARNING: No messages in input queue after publishing. Message may not have been routed correctly." >&2
+  echo "Publish response: $PUBLISH_RESPONSE" >&2
+fi
+
+if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown" ]; then
+  echo "WARNING: No consumers connected to input queue! Model may not be consuming messages." >&2
+fi
+
+echo ">>> Waiting for model to process message..."
+
+# Check both queues to see their status
+function checkQueueStatus {
+  INPUT_QUEUE_STATUS=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
+      --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+  OUTPUT_QUEUE_STATUS=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output" \
+      --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+  
+  INPUT_MESSAGES=$(echo "$INPUT_QUEUE_STATUS" | jq -r '.messages // 0' 2>/dev/null || echo "unknown")
+  INPUT_CONSUMERS=$(echo "$INPUT_QUEUE_STATUS" | jq -r '.consumers // 0' 2>/dev/null || echo "unknown")
+  OUTPUT_MESSAGES=$(echo "$OUTPUT_QUEUE_STATUS" | jq -r '.messages // 0' 2>/dev/null || echo "unknown")
+  OUTPUT_CONSUMERS=$(echo "$OUTPUT_QUEUE_STATUS" | jq -r '.consumers // 0' 2>/dev/null || echo "unknown")
+  
+  echo "Queue status - Input: messages=$INPUT_MESSAGES, consumers=$INPUT_CONSUMERS | Output: messages=$OUTPUT_MESSAGES, consumers=$OUTPUT_CONSUMERS" >&2
+  
+  if [ "$INPUT_CONSUMERS" = "0" ]; then
+    echo "WARNING: No consumers connected to input queue! Model may not be consuming messages." >&2
+  fi
+  
+  if [ "$INPUT_MESSAGES" != "0" ] && [ "$INPUT_MESSAGES" != "unknown" ]; then
+    echo "WARNING: Messages accumulating in input queue ($INPUT_MESSAGES messages). Model may not be processing." >&2
+  fi
+}
 
 function retrieveIrisResult {
   RESPONSE=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
@@ -104,15 +174,17 @@ function retrieveIrisResult {
   
   # Check if response is an empty array (queue is empty)
   if echo "$RESPONSE" | jq -e 'length == 0' > /dev/null 2>&1; then
-    # Queue is empty - check queue status for debugging
+    # Queue is empty - check queue status and input queue for debugging
     QUEUE_INFO=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output" \
         --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
     if echo "$QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
       echo "Queue does not exist or error accessing it: $QUEUE_INFO" >&2
     else
       MESSAGE_COUNT=$(echo "$QUEUE_INFO" | jq -r '.messages // 0' 2>/dev/null || echo "unknown")
-      echo "Queue is empty (messages: $MESSAGE_COUNT). Waiting for model response..." >&2
+      echo "Output queue is empty (messages: $MESSAGE_COUNT). Waiting for model response..." >&2
     fi
+    # Check both queues status
+    checkQueueStatus
     return 1
   fi
   
@@ -129,8 +201,37 @@ function retrieveIrisResult {
 }
 with_backoff retrieveIrisResult
 
+# If we still don't have a result, provide diagnostics before exiting
+if [ -z "${IRIS_RESULT_PAYLOAD:-}" ]; then
+  echo ""
+  echo ">>> Test failed: No response received from model"
+  echo ">>> Final queue status:"
+  checkQueueStatus
+  echo ""
+  echo "Check model pod logs for errors:"
+  for pod in $MODEL_PODS; do
+    echo "  kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=50"
+  done
+  echo ""
+  echo "Check RabbitMQ queues and connections:"
+  echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_queues name messages consumers"
+  echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_connections"
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
 if [ "${EXPECTED_IRIS_RESULT_PAYLOAD}" != "${IRIS_RESULT_PAYLOAD}" ]; then
   echo "UNEXPECTED IRIS MODEL RESULT: ${IRIS_RESULT_PAYLOAD}"
+  echo ""
+  echo ">>> Diagnostics:"
+  echo "Check model pod logs for errors:"
+  for pod in $MODEL_PODS; do
+    echo "  kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier"
+  done
+  echo ""
+  echo "Check RabbitMQ connection:"
+  echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_connections"
+  echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_queues name messages consumers"
   kill $PORT_FORWARD_PID 2>/dev/null || true
   exit 1
 fi
