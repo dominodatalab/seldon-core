@@ -98,5 +98,27 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
 echo ">>> Verifying RabbitMQ service..."
 kubectl get svc rabbitmq-ha -n rabbitmq
 
+echo ">>> Waiting for RabbitMQ to be listening on port 5672..."
+RABBITMQ_POD=$(kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [ -z "$RABBITMQ_POD" ]; then
+  echo "ERROR: RabbitMQ pod not found"
+  exit 1
+fi
+
+# Wait for RabbitMQ to actually be listening on port 5672
+# Pod being Ready doesn't guarantee RabbitMQ is listening yet
+for i in {1..30}; do
+  if kubectl -n rabbitmq exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
+    sh -c "nc -z localhost 5672 2>/dev/null || ss -tlnp 2>/dev/null | grep -q ':5672 ' || netstat -tlnp 2>/dev/null | grep -q ':5672 '" 2>/dev/null; then
+    echo "✓ RabbitMQ is listening on port 5672"
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    echo "WARNING: RabbitMQ not listening on port 5672 after 30 attempts (60 seconds)"
+    echo "This may cause connection issues. Continuing anyway..."
+  fi
+  sleep 2
+done
+
 echo ">>> Done installing RabbitMQ (rabbitmq-ha chart)."
 
