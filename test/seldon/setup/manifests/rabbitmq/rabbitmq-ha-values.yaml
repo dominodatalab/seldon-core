@@ -45,6 +45,7 @@ definitions:
       read: ".*"
   vhosts:
     - name: "/"
+    - name: "data-plane-service"
 
 # Disable persistence for faster tests (optional - can enable if needed)
 persistentVolume:
@@ -56,3 +57,4 @@ podManagementPolicy: Parallel
 # Prometheus plugin (if needed for monitoring)
 rabbitmqPrometheusPlugin:
   enabled: true
+
