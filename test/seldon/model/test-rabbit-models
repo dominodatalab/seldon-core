@@ -404,6 +404,57 @@ if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown
     DIAGNOSTIC_FAILED=true
   fi
   
+  # Test connectivity from a model pod to RabbitMQ service
+  # Note: The connectivity test uses port-forward (host->pod), which works
+  # But model pods connect via service (pod->service->pod), which may be blocked
+  echo ">>> Testing connectivity from model pod to RabbitMQ service (same path orchestrator uses)..." >&2
+  FIRST_MODEL_POD=$(echo "$MODEL_PODS" | awk '{print $1}')
+  if [ -n "$FIRST_MODEL_POD" ]; then
+    # Try DNS resolution first
+    echo "  Testing DNS resolution..." >&2
+    DNS_RESULT=$(kubectl exec ${FIRST_MODEL_POD} -n ${COMPUTE_NAMESPACE} -c seldon-container-engine -- \
+      sh -c "nslookup rabbitmq-ha.rabbitmq.svc.cluster.local 2>&1 || getent hosts rabbitmq-ha.rabbitmq.svc.cluster.local 2>&1" 2>/dev/null || echo "DNS_FAILED")
+    if [ "$DNS_RESULT" != "DNS_FAILED" ] && echo "$DNS_RESULT" | grep -q "rabbitmq-ha"; then
+      echo "  ✓ DNS resolution works" >&2
+      echo "$DNS_RESULT" | head -3 | sed 's/^/    /' >&2
+    else
+      echo "  ERROR: DNS resolution failed" >&2
+      DIAGNOSTIC_FAILED=true
+    fi
+    
+    # Try to connect to RabbitMQ service from model pod (same way orchestrator does)
+    echo "  Testing TCP connection to rabbitmq-ha.rabbitmq.svc.cluster.local:5672..." >&2
+    CONNECT_RESULT=$(kubectl exec ${FIRST_MODEL_POD} -n ${COMPUTE_NAMESPACE} -c seldon-container-engine -- \
+      sh -c "timeout 5 nc -zv rabbitmq-ha.rabbitmq.svc.cluster.local 5672 2>&1 || timeout 5 sh -c 'exec 3<>/dev/tcp/rabbitmq-ha.rabbitmq.svc.cluster.local/5672 && echo connected && exec 3<&- && exec 3>&-' 2>&1" 2>/dev/null || echo "CONNECT_FAILED")
+    if echo "$CONNECT_RESULT" | grep -qiE "(succeeded|open|connected)"; then
+      echo "  ✓ Model pod can reach RabbitMQ service on port 5672" >&2
+    else
+      echo "  ERROR: Model pod CANNOT reach RabbitMQ service on port 5672" >&2
+      echo "  Connection result: $CONNECT_RESULT" >&2
+      echo "  This indicates a network connectivity issue:" >&2
+      echo "    - Network policy may be blocking traffic from ${COMPUTE_NAMESPACE} to ${RABBITMQ_NAMESPACE}" >&2
+      echo "    - Service routing may not be working correctly" >&2
+      echo "    - Note: Port-forward works (host->pod), but service routing (pod->service->pod) fails" >&2
+      
+      # Check for network policies that might be blocking the connection
+      echo "  Checking for network policies..." >&2
+      NP_IN_COMPUTE=$(kubectl get networkpolicies -n ${COMPUTE_NAMESPACE} -o name 2>/dev/null | wc -l || echo "0")
+      NP_IN_RABBITMQ=$(kubectl get networkpolicies -n ${RABBITMQ_NAMESPACE} -o name 2>/dev/null | wc -l || echo "0")
+      if [ "$NP_IN_COMPUTE" != "0" ] || [ "$NP_IN_RABBITMQ" != "0" ]; then
+        echo "  Found network policies:" >&2
+        echo "    - ${COMPUTE_NAMESPACE} namespace: $NP_IN_COMPUTE network policy(ies)" >&2
+        echo "    - ${RABBITMQ_NAMESPACE} namespace: $NP_IN_RABBITMQ network policy(ies)" >&2
+        echo "  Network policies may be blocking inter-namespace traffic" >&2
+        echo "  Check for:" >&2
+        echo "    - Egress policies in ${COMPUTE_NAMESPACE} blocking traffic to ${RABBITMQ_NAMESPACE}" >&2
+        echo "    - Ingress policies in ${RABBITMQ_NAMESPACE} blocking traffic from ${COMPUTE_NAMESPACE}" >&2
+      else
+        echo "  No network policies found in either namespace" >&2
+      fi
+      DIAGNOSTIC_FAILED=true
+    fi
+  fi
+  
   # Check RabbitMQ connections from RabbitMQ side
   echo ">>> Checking RabbitMQ connections..." >&2
   RABBITMQ_CONNECTIONS=$(curl -s -u "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" "http://localhost:15672/api/connections" 2>/dev/null || echo "[]")
