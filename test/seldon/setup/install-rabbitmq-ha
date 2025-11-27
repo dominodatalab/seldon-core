@@ -56,8 +56,42 @@ sleep 10
 echo ">>> Waiting for RabbitMQ pod to be ready..."
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
   --timeout=300s -n rabbitmq || {
-    echo "Warning: RabbitMQ pod not ready, checking status..."
-    kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
+    echo "ERROR: RabbitMQ pod not ready after timeout, gathering diagnostics..."
+    
+    # Get pod name
+    RABBITMQ_POD=$(kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    
+    if [ -n "$RABBITMQ_POD" ]; then
+      echo ">>> Pod status:"
+      kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
+      
+      echo ""
+      echo ">>> Pod description:"
+      kubectl describe pod -n rabbitmq "$RABBITMQ_POD" || true
+      
+      echo ""
+      echo ">>> Pod events:"
+      kubectl get events -n rabbitmq --field-selector involvedObject.name="$RABBITMQ_POD" --sort-by='.lastTimestamp' || true
+      
+      echo ""
+      echo ">>> Pod logs (main container):"
+      kubectl logs -n rabbitmq "$RABBITMQ_POD" || true
+      
+      # Check for init containers
+      INIT_CONTAINERS=$(kubectl get pod -n rabbitmq "$RABBITMQ_POD" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null || echo "")
+      if [ -n "$INIT_CONTAINERS" ]; then
+        for INIT_CONTAINER in $INIT_CONTAINERS; do
+          echo ""
+          echo ">>> Pod logs (init container: $INIT_CONTAINER):"
+          kubectl logs -n rabbitmq "$RABBITMQ_POD" -c "$INIT_CONTAINER" || true
+        done
+      fi
+    else
+      echo "ERROR: No RabbitMQ pod found"
+      kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
+      kubectl get statefulset -n rabbitmq || true
+    fi
+    
     exit 1
   }
 
