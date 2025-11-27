@@ -55,6 +55,21 @@ if ! kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} &>/
   exit 1
 fi
 
+# Verify secret credentials match RabbitMQ user
+SECRET_USERNAME=$(kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} -o jsonpath='{.data.username}' | base64 --decode 2>/dev/null || echo "")
+SECRET_PASSWORD=$(kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} -o jsonpath='{.data.password}' | base64 --decode 2>/dev/null || echo "")
+
+if [ "$SECRET_USERNAME" != "$RABBITMQ_USER" ]; then
+  echo "WARNING: Secret username ($SECRET_USERNAME) does not match expected RabbitMQ user ($RABBITMQ_USER)" >&2
+fi
+
+if [ "$SECRET_PASSWORD" != "$RABBITMQ_PASSWORD" ]; then
+  echo "WARNING: Secret password does not match expected RabbitMQ password" >&2
+  echo "This may prevent the model from connecting to RabbitMQ." >&2
+fi
+
+echo "Secret verified: username=$SECRET_USERNAME"
+
 echo ">>> Checking model pod status..."
 MODEL_PODS=$(kubectl get pods -n ${COMPUTE_NAMESPACE} -l seldon-deployment-id=iris-model-rabbitmq -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 if [ -z "$MODEL_PODS" ]; then
@@ -63,9 +78,20 @@ else
   echo "Model pods: $MODEL_PODS"
   for pod in $MODEL_PODS; do
     POD_STATUS=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    echo "  Pod $pod: $POD_STATUS"
+    POD_READY=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+    echo "  Pod $pod: $POD_STATUS (Ready: $POD_READY)"
   done
 fi
+
+echo ">>> Verifying RabbitMQ service is accessible..."
+if ! kubectl get svc rabbitmq-ha -n ${RABBITMQ_NAMESPACE} &>/dev/null; then
+  echo "ERROR: RabbitMQ service 'rabbitmq-ha' not found in namespace ${RABBITMQ_NAMESPACE}" >&2
+  exit 1
+fi
+
+RABBITMQ_SVC_IP=$(kubectl get svc rabbitmq-ha -n ${RABBITMQ_NAMESPACE} -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+RABBITMQ_SVC_PORT=$(kubectl get svc rabbitmq-ha -n ${RABBITMQ_NAMESPACE} -o jsonpath='{.spec.ports[?(@.name=="amqp")].port}' 2>/dev/null || echo "5672")
+echo "RabbitMQ service: clusterIP=$RABBITMQ_SVC_IP, port=$RABBITMQ_SVC_PORT"
 
 echo ">>> Setting up port-forward to RabbitMQ Management API..."
 # Use port-forward to access Management API since curl is not available in container
@@ -208,12 +234,34 @@ if [ -z "${IRIS_RESULT_PAYLOAD:-}" ]; then
   echo ">>> Final queue status:"
   checkQueueStatus
   echo ""
-  echo "Check model pod logs for errors:"
+  echo ">>> Model Configuration Check:"
+  # Check environment variables in one of the pods
+  FIRST_POD=$(echo $MODEL_PODS | awk '{print $1}')
+  if [ -n "$FIRST_POD" ]; then
+    echo "Checking environment variables in pod $FIRST_POD:"
+    echo "  RABBITMQ_BROKER_URL:"
+    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_BROKER_URL || echo "    (not found)"
+    echo "  RABBITMQ_USERNAME:"
+    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_USERNAME || echo "    (not found)"
+    echo "  RABBITMQ_INPUT_QUEUE:"
+    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_INPUT_QUEUE || echo "    (not found)"
+    echo "  RABBITMQ_OUTPUT_QUEUE:"
+    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_OUTPUT_QUEUE || echo "    (not found)"
+  fi
+  echo ""
+  echo ">>> Secret Check:"
+  echo "Secret 'seldon-user-user-credentials' contents:"
+  kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} -o jsonpath='{.data.username}' | base64 --decode 2>/dev/null && echo " (username)" || echo "  (username not found)"
+  kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} -o jsonpath='{.data.password}' | base64 --decode 2>/dev/null | head -c 10 && echo "... (password)" || echo "  (password not found)"
+  echo ""
+  echo ">>> Model Pod Logs (last 30 lines):"
   for pod in $MODEL_PODS; do
-    echo "  kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=50"
+    echo "--- Pod $pod ---"
+    kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=30 2>&1 | grep -i "rabbitmq\|error\|fail\|connection" || echo "  (no relevant logs found)"
   done
   echo ""
-  echo "Check RabbitMQ queues and connections:"
+  echo ">>> RabbitMQ Diagnostics:"
+  echo "To check queues and connections manually:"
   echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_queues name messages consumers"
   echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_connections"
   kill $PORT_FORWARD_PID 2>/dev/null || true
