@@ -10,9 +10,6 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 echo ">>> Creating namespace..."
 kubectl create namespace rabbitmq --dry-run=client -o yaml | kubectl apply -f -
 
-# Note: seldon-regression-test namespace should already exist from install-test-namespace
-# (called before this script in install-all). If running standalone, ensure it exists first.
-
 echo ">>> Creating domino-quay-repos secret for pulling Domino docker images..."
 kubectl create secret -n rabbitmq docker-registry domino-quay-repos \
   --docker-username="${DOCKER_USERNAME}" \
@@ -21,6 +18,9 @@ kubectl create secret -n rabbitmq docker-registry domino-quay-repos \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo ">>> Creating seldon user secret..."
+# Apply the secret file which contains secrets for both rabbitmq and seldon-regression-test namespaces
+# Note: seldon-regression-test namespace should already exist from install-test-namespace
+# With set -o errexit, kubectl apply will fail if the namespace doesn't exist or if there's any other error
 kubectl apply -f "${SCRIPT_DIR}/manifests/rabbitmq/seldon-user-secret.yaml"
 
 echo ">>> Authenticating with GCR for Helm chart access..."
@@ -57,26 +57,26 @@ echo ">>> Waiting for RabbitMQ pod to be ready..."
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
   --timeout=300s -n rabbitmq || {
     echo "ERROR: RabbitMQ pod not ready after timeout, gathering diagnostics..."
-
+    
     # Get pod name
     RABBITMQ_POD=$(kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
+    
     if [ -n "$RABBITMQ_POD" ]; then
       echo ">>> Pod status:"
       kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
-
+      
       echo ""
       echo ">>> Pod description:"
       kubectl describe pod -n rabbitmq "$RABBITMQ_POD" || true
-
+      
       echo ""
       echo ">>> Pod events:"
       kubectl get events -n rabbitmq --field-selector involvedObject.name="$RABBITMQ_POD" --sort-by='.lastTimestamp' || true
-
+      
       echo ""
       echo ">>> Pod logs (main container):"
       kubectl logs -n rabbitmq "$RABBITMQ_POD" --tail=100 || true
-
+      
       # Check for init containers
       INIT_CONTAINERS=$(kubectl get pod -n rabbitmq "$RABBITMQ_POD" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null || echo "")
       if [ -n "$INIT_CONTAINERS" ]; then
@@ -91,7 +91,7 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=rabbitmq-ha \
       kubectl get pods -n rabbitmq -l app.kubernetes.io/name=rabbitmq-ha || true
       kubectl get statefulset -n rabbitmq || true
     fi
-
+    
     exit 1
   }
 

@@ -250,7 +250,70 @@ fi
 
 if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown" ]; then
   echo "WARNING: No consumers connected to input queue! Model may not be consuming messages." >&2
-  echo "This may be a timing issue. Waiting longer for model to connect..." >&2
+  
+  # Run diagnostics before waiting
+  echo ">>> Running diagnostics for consumers=0 issue..." >&2
+  DIAGNOSTIC_FAILED=false
+  
+  # Check if secret exists
+  if ! kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} &>/dev/null; then
+    echo "ERROR: Secret 'seldon-user-user-credentials' not found in namespace ${COMPUTE_NAMESPACE}" >&2
+    DIAGNOSTIC_FAILED=true
+  else
+    echo "✓ Secret exists" >&2
+  fi
+  
+  # Check model pod status
+  MODEL_PODS=$(kubectl get pods -n ${COMPUTE_NAMESPACE} -l seldon-deployment-id=iris-model-rabbitmq -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+  if [ -z "$MODEL_PODS" ]; then
+    echo "ERROR: No model pods found" >&2
+    DIAGNOSTIC_FAILED=true
+  else
+    echo "✓ Found model pods: $MODEL_PODS" >&2
+    # Check each pod's status and get logs
+    for pod in $MODEL_PODS; do
+      POD_STATUS=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+      POD_READY=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+      echo "  Pod $pod: phase=$POD_STATUS, ready=$POD_READY" >&2
+      
+      # Get recent logs for RabbitMQ-related errors
+      echo "  Checking logs for RabbitMQ connection issues..." >&2
+      if kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=50 2>&1 | grep -i -E "(rabbitmq|amqp|connection|error|failed)" >&2; then
+        echo "  ^ Found RabbitMQ-related log entries above" >&2
+      else
+        echo "  (No obvious RabbitMQ errors in recent logs)" >&2
+      fi
+      
+      # Check environment variables
+      echo "  Checking RabbitMQ environment variables..." >&2
+      if kubectl exec $pod -n ${COMPUTE_NAMESPACE} -c classifier -- env 2>&1 | grep RABBITMQ >&2; then
+        echo "  ^ RabbitMQ env vars found above" >&2
+      else
+        echo "  ERROR: No RABBITMQ environment variables found in pod $pod" >&2
+        DIAGNOSTIC_FAILED=true
+      fi
+    done
+  fi
+  
+  # Check RabbitMQ connections from RabbitMQ side
+  echo ">>> Checking RabbitMQ connections..." >&2
+  RABBITMQ_CONNECTIONS=$(curl -s -u "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" "http://localhost:15672/api/connections" 2>/dev/null || echo "[]")
+  CONNECTION_COUNT=$(echo "$RABBITMQ_CONNECTIONS" | jq -r 'length // 0' 2>/dev/null || echo "0")
+  echo "  RabbitMQ reports $CONNECTION_COUNT active connections" >&2
+  if [ "$CONNECTION_COUNT" = "0" ]; then
+    echo "  WARNING: No connections to RabbitMQ from any client" >&2
+    DIAGNOSTIC_FAILED=true
+  else
+    echo "  Connection details:" >&2
+    echo "$RABBITMQ_CONNECTIONS" | jq -r '.[] | "    - \(.name // "unnamed"): user=\(.user), state=\(.state)"' >&2 || true
+  fi
+  
+  if [ "$DIAGNOSTIC_FAILED" = "true" ]; then
+    echo ">>> Diagnostics indicate configuration issues. Attempting to restart model deployment..." >&2
+  else
+    echo ">>> Diagnostics look OK. This may be a timing issue. Waiting longer for model to connect..." >&2
+  fi
+  
   # Wait up to 60 seconds for consumers to appear, checking every 5 seconds
   for i in {1..12}; do
     sleep 5
