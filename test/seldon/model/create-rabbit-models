@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Create RabbitMQ models using rabbitmq-ha chart approach
+# Note: Queues should already be created by install-rabbitmq-ha script
+
 set -o nounset -o errexit -o pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -14,7 +17,10 @@ kubectl apply -f $MODELS_DIR/iris-model-rabbitmq.yaml -n $COMPUTE_NAMESPACE
 sleep 5
 
 echo ">>> Waiting for iris model deployment to become available..."
-kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n $COMPUTE_NAMESPACE --for condition=Available=True --timeout=600s
+if ! kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n $COMPUTE_NAMESPACE --for condition=Available=True --timeout=600s; then
+  echo "ERROR: Model deployment not ready after timeout"
+  exit 1
+fi
 
 #
 # Tensorflow model does not work as our RabbitMQ server only accepts payloads in Seldon format, not raw tensorflow

@@ -48,6 +48,16 @@ if ! kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n ${
   echo "WARNING: Model deployment may not be ready. Continuing anyway..."
 fi
 
+# Give model pods time to connect to RabbitMQ after deployment is ready
+# This is important in fresh clusters where everything starts from scratch
+# The executor needs time to:
+# 1. Start up
+# 2. Read environment variables
+# 3. Establish connection to RabbitMQ
+# 4. Create consumer and register with the queue
+echo ">>> Waiting for model pods to establish RabbitMQ connections..."
+sleep 20
+
 echo ">>> Verifying model secret exists..."
 if ! kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} &>/dev/null; then
   echo "ERROR: Secret 'seldon-user-user-credentials' not found in namespace ${COMPUTE_NAMESPACE}" >&2
@@ -117,7 +127,68 @@ if echo "$OUTPUT_QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
   exit 1
 fi
 
-echo ">>> Queues verified. Sending predict message to iris rabbitmq model input queue..."
+echo ">>> Running RabbitMQ connectivity test..."
+# Create a test queue for connectivity check
+TEST_QUEUE="test-connectivity-$(date +%s)"
+TEST_MESSAGE='{"test": "message"}'
+
+# Create test queue
+curl -s -X PUT "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+    -H "Content-type: application/json" \
+    -H "Accept: application/json" \
+    -d '{"auto_delete":true,"durable":false,"arguments":{}}' > /dev/null 2>&1
+
+# Publish test message
+PUBLISH_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+    -H "Content-type: application/json" \
+    -H "Accept: application/json" \
+    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":\"${TEST_MESSAGE}\",\"payload_encoding\":\"string\"}")
+
+if echo "$PUBLISH_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: RabbitMQ connectivity test failed - cannot publish: $PUBLISH_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+PUBLISH_TEST_ROUTED=$(echo "$PUBLISH_TEST_RESPONSE" | jq -r '.routed // false' 2>/dev/null)
+if [ "$PUBLISH_TEST_ROUTED" != "true" ]; then
+  echo "ERROR: RabbitMQ connectivity test failed - message not routed: $PUBLISH_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+# Consume test message
+sleep 1
+CONSUME_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}/get" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+    -H "Content-type: application/json" \
+    -H "Accept: application/json" \
+    -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}')
+
+if echo "$CONSUME_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: RabbitMQ connectivity test failed - cannot consume: $CONSUME_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+CONSUMED_MESSAGE=$(echo "$CONSUME_TEST_RESPONSE" | jq -r '.[0].payload // empty' 2>/dev/null)
+if [ "$CONSUMED_MESSAGE" != "$TEST_MESSAGE" ]; then
+  echo "ERROR: RabbitMQ connectivity test failed - message mismatch" >&2
+  echo "  Expected: $TEST_MESSAGE" >&2
+  echo "  Got: $CONSUMED_MESSAGE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+# Clean up test queue
+curl -s -X DELETE "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" > /dev/null 2>&1
+
+echo "✓ RabbitMQ connectivity test passed"
+
+echo ">>> Sending predict message to iris rabbitmq model input queue..."
 
 PUBLISH_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
@@ -158,6 +229,50 @@ fi
 
 if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown" ]; then
   echo "WARNING: No consumers connected to input queue! Model may not be consuming messages." >&2
+  echo "This may be a timing issue. Waiting longer for model to connect..." >&2
+  # Wait up to 60 seconds for consumers to appear, checking every 5 seconds
+  for i in {1..12}; do
+    sleep 5
+    INPUT_QUEUE_CHECK=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
+        --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+    INPUT_CONSUMERS_CHECK=$(echo "$INPUT_QUEUE_CHECK" | jq -r '.consumers // 0' 2>/dev/null || echo "unknown")
+    if [ "$INPUT_CONSUMERS_CHECK" != "0" ] && [ "$INPUT_CONSUMERS_CHECK" != "unknown" ]; then
+      echo "✓ Consumers connected after waiting ($INPUT_CONSUMERS_CHECK consumers)"
+      break
+    fi
+    echo "  Still waiting... (attempt $i/12, consumers=$INPUT_CONSUMERS_CHECK)" >&2
+  done
+  
+  # Re-check consumers after waiting
+  INPUT_QUEUE_AFTER=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
+      --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+  INPUT_CONSUMERS_AFTER=$(echo "$INPUT_QUEUE_AFTER" | jq -r '.consumers // 0' 2>/dev/null || echo "unknown")
+  
+  if [ "$INPUT_CONSUMERS_AFTER" != "0" ] && [ "$INPUT_CONSUMERS_AFTER" != "unknown" ]; then
+    echo "✓ Consumers connected after waiting!"
+  else
+    echo "Still no consumers. Attempting to restart model deployment..." >&2
+    kubectl rollout restart deployment.apps/iris-model-rabbitmq-default-0-classifier -n ${COMPUTE_NAMESPACE} 2>/dev/null || true
+    echo "Waiting for model deployment to be ready after restart..."
+    if kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n ${COMPUTE_NAMESPACE} --for condition=Available=True --timeout=120s 2>/dev/null; then
+      echo "Model deployment restarted and ready. Waiting for RabbitMQ connection..."
+      sleep 15
+      # Final check
+      INPUT_QUEUE_FINAL=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
+          --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
+      INPUT_CONSUMERS_FINAL=$(echo "$INPUT_QUEUE_FINAL" | jq -r '.consumers // 0' 2>/dev/null || echo "unknown")
+      echo "Consumers after restart: $INPUT_CONSUMERS_FINAL"
+      if [ "$INPUT_CONSUMERS_FINAL" = "0" ] || [ "$INPUT_CONSUMERS_FINAL" = "unknown" ]; then
+        echo "ERROR: Still no consumers after restart. This indicates a configuration issue." >&2
+        echo "The model pods are not connecting to RabbitMQ. Check:" >&2
+        echo "  1. RABBITMQ_BROKER_URL environment variable in model pods" >&2
+        echo "  2. RABBITMQ_USERNAME and RABBITMQ_PASSWORD are set correctly" >&2
+        echo "  3. Model pod logs for connection errors" >&2
+      fi
+    else
+      echo "WARNING: Model deployment restart timed out or failed." >&2
+    fi
+  fi
 fi
 
 echo ">>> Waiting for model to process message..."
@@ -234,36 +349,33 @@ if [ -z "${IRIS_RESULT_PAYLOAD:-}" ]; then
   echo ">>> Final queue status:"
   checkQueueStatus
   echo ""
-  echo ">>> Model Configuration Check:"
-  # Check environment variables in one of the pods
-  FIRST_POD=$(echo $MODEL_PODS | awk '{print $1}')
-  if [ -n "$FIRST_POD" ]; then
-    echo "Checking environment variables in pod $FIRST_POD:"
-    echo "  RABBITMQ_BROKER_URL:"
-    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_BROKER_URL || echo "    (not found)"
-    echo "  RABBITMQ_USERNAME:"
-    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_USERNAME || echo "    (not found)"
-    echo "  RABBITMQ_INPUT_QUEUE:"
-    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_INPUT_QUEUE || echo "    (not found)"
-    echo "  RABBITMQ_OUTPUT_QUEUE:"
-    kubectl exec $FIRST_POD -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ_OUTPUT_QUEUE || echo "    (not found)"
-  fi
+  echo ">>> Possible Issues:"
+  echo "1. Model pods may have been created before RabbitMQ was ready"
+  echo "   Solution: Restart the model deployment:"
+  echo "   kubectl rollout restart deployment/iris-model-rabbitmq-default-0-classifier -n ${COMPUTE_NAMESPACE}"
   echo ""
-  echo ">>> Secret Check:"
-  echo "Secret 'seldon-user-user-credentials' contents:"
-  kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} -o jsonpath='{.data.username}' | base64 --decode 2>/dev/null && echo " (username)" || echo "  (username not found)"
-  kubectl get secret seldon-user-user-credentials -n ${COMPUTE_NAMESPACE} -o jsonpath='{.data.password}' | base64 --decode 2>/dev/null | head -c 10 && echo "... (password)" || echo "  (password not found)"
+  echo "2. Model pods may not have the correct RabbitMQ configuration"
+  echo "   Check environment variables in model pods:"
+  echo "   kubectl exec <pod-name> -n ${COMPUTE_NAMESPACE} -c classifier -- env | grep RABBITMQ"
   echo ""
-  echo ">>> Model Pod Logs (last 30 lines):"
-  for pod in $MODEL_PODS; do
-    echo "--- Pod $pod ---"
-    kubectl logs $pod -n ${COMPUTE_NAMESPACE} -c classifier --tail=30 2>&1 | grep -i "rabbitmq\|error\|fail\|connection" || echo "  (no relevant logs found)"
-  done
+  echo "3. Model pods may be failing to connect to RabbitMQ"
+  echo "   Check model pod logs for connection errors:"
+  echo "   kubectl logs <pod-name> -n ${COMPUTE_NAMESPACE} -c classifier | grep -i rabbitmq"
   echo ""
-  echo ">>> RabbitMQ Diagnostics:"
-  echo "To check queues and connections manually:"
-  echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_queues name messages consumers"
-  echo "  kubectl exec -n ${RABBITMQ_NAMESPACE} ${RABBITMQ_POD} -c rabbitmq-ha -- rabbitmqctl list_connections"
+  echo "4. Verify RabbitMQ service is accessible from model pods:"
+  echo "   kubectl exec <pod-name> -n ${COMPUTE_NAMESPACE} -c classifier -- nslookup rabbitmq-ha.rabbitmq.svc.cluster.local"
+  echo ""
+  echo ">>> Configuration Summary:"
+  echo "Expected broker URL: amqp://seldon:<password>@rabbitmq-ha.rabbitmq.svc.cluster.local:5672"
+  echo "Expected input queue: iris-model-rabbitmq-input"
+  echo "Expected output queue: iris-model-rabbitmq-output"
+  echo "Secret name: seldon-user-user-credentials"
+  echo "Secret namespace: ${COMPUTE_NAMESPACE}"
+  echo ""
+  echo ">>> RabbitMQ Service Info:"
+  echo "Service: rabbitmq-ha.${RABBITMQ_NAMESPACE}.svc.cluster.local"
+  echo "Port: 5672"
+  echo "Management API: Port 15672 (via port-forward)"
   kill $PORT_FORWARD_PID 2>/dev/null || true
   exit 1
 fi
