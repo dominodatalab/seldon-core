@@ -61,12 +61,14 @@ curl -s -X PUT "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
     -H "Accept: application/json" \
     -d '{"auto_delete":true,"durable":false,"arguments":{}}' > /dev/null 2>&1
 
-# Publish test message (properly escape JSON)
+# Publish test message (payload must be a JSON-escaped string when payload_encoding is "string")
+# Use jq -Rs to read as raw string and output as JSON string
+TEST_MESSAGE_ESCAPED=$(echo "$TEST_MESSAGE" | jq -Rs .)
 PUBLISH_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     -H "Content-type: application/json" \
     -H "Accept: application/json" \
-    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":$(echo "$TEST_MESSAGE" | jq -c .),\"payload_encoding\":\"string\"}")
+    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":${TEST_MESSAGE_ESCAPED},\"payload_encoding\":\"string\"}")
 
 if echo "$PUBLISH_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
   echo "ERROR: RabbitMQ connectivity test failed - cannot publish: $PUBLISH_TEST_RESPONSE" >&2
@@ -212,25 +214,6 @@ if echo "$OUTPUT_QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
   kill $PORT_FORWARD_PID 2>/dev/null || true
   exit 1
 fi
-
-echo ">>> Running RabbitMQ connectivity test (independent of model pods)..."
-# Create a test queue for connectivity check
-TEST_QUEUE="test-connectivity-$(date +%s)"
-TEST_MESSAGE='{"test":"message"}'
-
-# Create test queue
-curl -s -X PUT "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
-    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-    -H "Content-type: application/json" \
-    -H "Accept: application/json" \
-    -d '{"auto_delete":true,"durable":false,"arguments":{}}' > /dev/null 2>&1
-
-# Publish test message (properly escape JSON)
-PUBLISH_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
-    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-    -H "Content-type: application/json" \
-    -H "Accept: application/json" \
-    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":$(echo "$TEST_MESSAGE" | jq -c .),\"payload_encoding\":\"string\"}")
 
 if echo "$PUBLISH_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
   echo "ERROR: RabbitMQ connectivity test failed - cannot publish: $PUBLISH_TEST_RESPONSE" >&2
