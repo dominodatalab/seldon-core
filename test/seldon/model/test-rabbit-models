@@ -374,6 +374,36 @@ if [ "$INPUT_CONSUMERS_BEFORE" = "0" ] || [ "$INPUT_CONSUMERS_BEFORE" = "unknown
     done
   fi
   
+  # Check RabbitMQ service endpoints
+  echo ">>> Checking RabbitMQ service endpoints..." >&2
+  RABBITMQ_ENDPOINTS=$(kubectl get endpoints rabbitmq-ha -n ${RABBITMQ_NAMESPACE} -o json 2>/dev/null || echo "{}")
+  ENDPOINT_ADDRESSES=$(echo "$RABBITMQ_ENDPOINTS" | jq -r '.subsets[0].addresses // [] | length' 2>/dev/null || echo "0")
+  ENDPOINT_PORTS=$(echo "$RABBITMQ_ENDPOINTS" | jq -r '.subsets[0].ports // []' 2>/dev/null || echo "[]")
+  echo "  Service endpoints: $ENDPOINT_ADDRESSES addresses" >&2
+  if [ "$ENDPOINT_ADDRESSES" = "0" ]; then
+    echo "  ERROR: RabbitMQ service has no endpoints! Service selector may not match pod labels." >&2
+    DIAGNOSTIC_FAILED=true
+  else
+    echo "  Endpoint ports:" >&2
+    echo "$ENDPOINT_PORTS" | jq -r '.[] | "    - \(.name): port=\(.port), targetPort=\(.targetPort)"' >&2 || true
+    # Check if AMQP port (5672) is in the endpoints
+    if ! echo "$ENDPOINT_PORTS" | jq -e '.[] | select(.name == "amqp" or .port == 5672)' > /dev/null 2>&1; then
+      echo "  WARNING: AMQP port (5672) not found in service endpoints" >&2
+      DIAGNOSTIC_FAILED=true
+    fi
+  fi
+  
+  # Check if RabbitMQ pod is listening on port 5672
+  echo ">>> Checking if RabbitMQ pod is listening on port 5672..." >&2
+  if kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
+    sh -c "nc -z localhost 5672 2>/dev/null || ss -tlnp 2>/dev/null | grep -q ':5672 ' || netstat -tlnp 2>/dev/null | grep -q ':5672 '" 2>/dev/null; then
+    echo "  ✓ RabbitMQ pod is listening on port 5672" >&2
+  else
+    echo "  ERROR: RabbitMQ pod is NOT listening on port 5672" >&2
+    echo "  This may indicate RabbitMQ is still starting up or failed to start" >&2
+    DIAGNOSTIC_FAILED=true
+  fi
+  
   # Check RabbitMQ connections from RabbitMQ side
   echo ">>> Checking RabbitMQ connections..." >&2
   RABBITMQ_CONNECTIONS=$(curl -s -u "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" "http://localhost:15672/api/connections" 2>/dev/null || echo "[]")
