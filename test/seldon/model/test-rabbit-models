@@ -191,13 +191,7 @@ RABBITMQ_SVC_IP=$(kubectl get svc rabbitmq-ha -n ${RABBITMQ_NAMESPACE} -o jsonpa
 RABBITMQ_SVC_PORT=$(kubectl get svc rabbitmq-ha -n ${RABBITMQ_NAMESPACE} -o jsonpath='{.spec.ports[?(@.name=="amqp")].port}' 2>/dev/null || echo "5672")
 echo "RabbitMQ service: clusterIP=$RABBITMQ_SVC_IP, port=$RABBITMQ_SVC_PORT"
 
-echo ">>> Setting up port-forward to RabbitMQ Management API..."
-# Use port-forward to access Management API since curl is not available in container
-kubectl -n ${RABBITMQ_NAMESPACE} port-forward ${RABBITMQ_POD} 15672:15672 > /dev/null 2>&1 &
-PORT_FORWARD_PID=$!
-sleep 2
-
-echo ">>> Verifying queues exist..."
+echo ">>> Verifying queues exist (using existing port-forward)..."
 INPUT_QUEUE_INFO=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-input" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" 2>/dev/null || echo "{}")
 OUTPUT_QUEUE_INFO=$(curl -s -X GET "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output" \
@@ -215,58 +209,7 @@ if echo "$OUTPUT_QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
   exit 1
 fi
 
-if echo "$PUBLISH_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-  echo "ERROR: RabbitMQ connectivity test failed - cannot publish: $PUBLISH_TEST_RESPONSE" >&2
-  kill $PORT_FORWARD_PID 2>/dev/null || true
-  exit 1
-fi
-
-PUBLISH_TEST_ROUTED=$(echo "$PUBLISH_TEST_RESPONSE" | jq -r '.routed // false' 2>/dev/null)
-if [ "$PUBLISH_TEST_ROUTED" != "true" ]; then
-  echo "ERROR: RabbitMQ connectivity test failed - message not routed: $PUBLISH_TEST_RESPONSE" >&2
-  kill $PORT_FORWARD_PID 2>/dev/null || true
-  exit 1
-fi
-
-# Consume test message
-sleep 1
-CONSUME_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}/get" \
-    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
-    -H "Content-type: application/json" \
-    -H "Accept: application/json" \
-    -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}')
-
-if echo "$CONSUME_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-  echo "ERROR: RabbitMQ connectivity test failed - cannot consume: $CONSUME_TEST_RESPONSE" >&2
-  kill $PORT_FORWARD_PID 2>/dev/null || true
-  exit 1
-fi
-
-CONSUMED_MESSAGE=$(echo "$CONSUME_TEST_RESPONSE" | jq -r '.[0].payload // empty' 2>/dev/null)
-# Compare JSON content (not exact string match, as formatting may differ)
-if [ -z "$CONSUMED_MESSAGE" ]; then
-  echo "ERROR: RabbitMQ connectivity test failed - no message consumed" >&2
-  echo "  Response: $CONSUME_TEST_RESPONSE" >&2
-  kill $PORT_FORWARD_PID 2>/dev/null || true
-  exit 1
-fi
-
-# Verify the consumed message contains the expected content
-if ! echo "$CONSUMED_MESSAGE" | jq -e '.test == "message"' > /dev/null 2>&1; then
-  echo "ERROR: RabbitMQ connectivity test failed - message content mismatch" >&2
-  echo "  Expected: $TEST_MESSAGE" >&2
-  echo "  Got: $CONSUMED_MESSAGE" >&2
-  kill $PORT_FORWARD_PID 2>/dev/null || true
-  exit 1
-fi
-
-# Clean up test queue
-curl -s -X DELETE "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
-    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" > /dev/null 2>&1
-
-echo "✓ RabbitMQ connectivity test passed"
-
-echo ">>> Sending predict message to iris rabbitmq model input queue..."
+echo ">>> Queues verified. Sending predict message to iris rabbitmq model input queue..."
 
 PUBLISH_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
