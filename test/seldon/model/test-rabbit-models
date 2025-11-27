@@ -43,6 +43,82 @@ fi
 
 EXPECTED_IRIS_RESULT_PAYLOAD='{"data":{"names":["t:0","t:1","t:2"],"ndarray":[[0.0006985194531162835,0.00366803903943666,0.995633441507447]]},"meta":{"requestPath":{"classifier":"seldonio/sklearnserver:1.17.1"}}}'
 
+echo ">>> Setting up port-forward to RabbitMQ Management API..."
+# Use port-forward to access Management API since curl is not available in container
+kubectl -n ${RABBITMQ_NAMESPACE} port-forward ${RABBITMQ_POD} 15672:15672 > /dev/null 2>&1 &
+PORT_FORWARD_PID=$!
+sleep 2
+
+echo ">>> Running RabbitMQ connectivity test (independent of model pods)..."
+# Create a test queue for connectivity check
+TEST_QUEUE="test-connectivity-$(date +%s)"
+TEST_MESSAGE='{"test":"message"}'
+
+# Create test queue
+curl -s -X PUT "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+    -H "Content-type: application/json" \
+    -H "Accept: application/json" \
+    -d '{"auto_delete":true,"durable":false,"arguments":{}}' > /dev/null 2>&1
+
+# Publish test message (properly escape JSON)
+PUBLISH_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+    -H "Content-type: application/json" \
+    -H "Accept: application/json" \
+    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":$(echo "$TEST_MESSAGE" | jq -c .),\"payload_encoding\":\"string\"}")
+
+if echo "$PUBLISH_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: RabbitMQ connectivity test failed - cannot publish: $PUBLISH_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+PUBLISH_TEST_ROUTED=$(echo "$PUBLISH_TEST_RESPONSE" | jq -r '.routed // false' 2>/dev/null)
+if [ "$PUBLISH_TEST_ROUTED" != "true" ]; then
+  echo "ERROR: RabbitMQ connectivity test failed - message not routed: $PUBLISH_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+# Consume test message
+sleep 1
+CONSUME_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}/get" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
+    -H "Content-type: application/json" \
+    -H "Accept: application/json" \
+    -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}')
+
+if echo "$CONSUME_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: RabbitMQ connectivity test failed - cannot consume: $CONSUME_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+CONSUMED_MESSAGE=$(echo "$CONSUME_TEST_RESPONSE" | jq -r '.[0].payload // empty' 2>/dev/null)
+# Compare JSON content (not exact string match, as formatting may differ)
+if [ -z "$CONSUMED_MESSAGE" ]; then
+  echo "ERROR: RabbitMQ connectivity test failed - no message consumed" >&2
+  echo "  Response: $CONSUME_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+# Verify the consumed message contains the expected content
+if ! echo "$CONSUMED_MESSAGE" | jq -e '.test == "message"' > /dev/null 2>&1; then
+  echo "ERROR: RabbitMQ connectivity test failed - message content mismatch" >&2
+  echo "  Expected: $TEST_MESSAGE" >&2
+  echo "  Got: $CONSUMED_MESSAGE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+# Clean up test queue
+curl -s -X DELETE "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
+    --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" > /dev/null 2>&1
+
+echo "✓ RabbitMQ connectivity test passed"
+
 echo ">>> Checking if model deployment is ready..."
 if ! kubectl wait deployment.apps/iris-model-rabbitmq-default-0-classifier -n ${COMPUTE_NAMESPACE} --for condition=Available=True --timeout=30s 2>/dev/null; then
   echo "WARNING: Model deployment may not be ready. Continuing anyway..."
@@ -86,11 +162,21 @@ if [ -z "$MODEL_PODS" ]; then
   echo "WARNING: No model pods found. Model may not be deployed correctly." >&2
 else
   echo "Model pods: $MODEL_PODS"
+  ALL_READY=true
   for pod in $MODEL_PODS; do
     POD_STATUS=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
     POD_READY=$(kubectl get pod $pod -n ${COMPUTE_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
     echo "  Pod $pod: $POD_STATUS (Ready: $POD_READY)"
+    if [ "$POD_READY" != "True" ]; then
+      ALL_READY=false
+    fi
   done
+  
+  if [ "$ALL_READY" != "true" ]; then
+    echo "WARNING: Some model pods are not ready. They may still be starting up or have issues." >&2
+    echo "Waiting additional time for pods to become ready..." >&2
+    sleep 10
+  fi
 fi
 
 echo ">>> Verifying RabbitMQ service is accessible..."
@@ -127,10 +213,10 @@ if echo "$OUTPUT_QUEUE_INFO" | jq -e '.error' > /dev/null 2>&1; then
   exit 1
 fi
 
-echo ">>> Running RabbitMQ connectivity test..."
+echo ">>> Running RabbitMQ connectivity test (independent of model pods)..."
 # Create a test queue for connectivity check
 TEST_QUEUE="test-connectivity-$(date +%s)"
-TEST_MESSAGE='{"test": "message"}'
+TEST_MESSAGE='{"test":"message"}'
 
 # Create test queue
 curl -s -X PUT "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
@@ -139,12 +225,12 @@ curl -s -X PUT "http://localhost:15672/api/queues/%2F/${TEST_QUEUE}" \
     -H "Accept: application/json" \
     -d '{"auto_delete":true,"durable":false,"arguments":{}}' > /dev/null 2>&1
 
-# Publish test message
+# Publish test message (properly escape JSON)
 PUBLISH_TEST_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     -H "Content-type: application/json" \
     -H "Accept: application/json" \
-    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":\"${TEST_MESSAGE}\",\"payload_encoding\":\"string\"}")
+    -d "{\"properties\":{\"content_type\":\"application/json\"},\"routing_key\":\"${TEST_QUEUE}\",\"payload\":$(echo "$TEST_MESSAGE" | jq -c .),\"payload_encoding\":\"string\"}")
 
 if echo "$PUBLISH_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
   echo "ERROR: RabbitMQ connectivity test failed - cannot publish: $PUBLISH_TEST_RESPONSE" >&2
@@ -174,8 +260,17 @@ if echo "$CONSUME_TEST_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
 fi
 
 CONSUMED_MESSAGE=$(echo "$CONSUME_TEST_RESPONSE" | jq -r '.[0].payload // empty' 2>/dev/null)
-if [ "$CONSUMED_MESSAGE" != "$TEST_MESSAGE" ]; then
-  echo "ERROR: RabbitMQ connectivity test failed - message mismatch" >&2
+# Compare JSON content (not exact string match, as formatting may differ)
+if [ -z "$CONSUMED_MESSAGE" ]; then
+  echo "ERROR: RabbitMQ connectivity test failed - no message consumed" >&2
+  echo "  Response: $CONSUME_TEST_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
+
+# Verify the consumed message contains the expected content
+if ! echo "$CONSUMED_MESSAGE" | jq -e '.test == "message"' > /dev/null 2>&1; then
+  echo "ERROR: RabbitMQ connectivity test failed - message content mismatch" >&2
   echo "  Expected: $TEST_MESSAGE" >&2
   echo "  Got: $CONSUMED_MESSAGE" >&2
   kill $PORT_FORWARD_PID 2>/dev/null || true
