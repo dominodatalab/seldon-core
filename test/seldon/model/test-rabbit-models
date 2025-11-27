@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test script for RabbitMQ models using rabbitmq-ha chart
+
 set -o nounset -o errexit -o pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -12,26 +14,18 @@ COMPUTE_NAMESPACE=seldon-regression-test
 RABBITMQ_NAMESPACE=rabbitmq
 
 echo ">>> Getting RabbitMQ credentials..."
-# Chart creates main secret 'rabbitmq-ha' with default user password
-# Default username comes from values (rabbitmqUsername: rabbitmq)
-# Default password is in secret 'rabbitmq-ha' with key 'rabbitmq-password'
-# For management API, we can use default user (rabbitmq) or seldon user
-RABBITMQ_USER="rabbitmq"  # Default from values.yaml
+# Use seldon user for management API access (has management tag)
+# seldon user credentials are in secret 'rabbitmq-ha.seldon'
+RABBITMQ_USER="seldon"
 RABBITMQ_PASSWORD=""
 
-# Try to get default user password from chart's main secret
-if kubectl get secret rabbitmq-ha -n ${RABBITMQ_NAMESPACE} &>/dev/null; then
-  RABBITMQ_PASSWORD=$(kubectl -n ${RABBITMQ_NAMESPACE} get secret rabbitmq-ha -o jsonpath="{.data.rabbitmq-password}" | base64 --decode 2>/dev/null || echo "")
+if kubectl get secret rabbitmq-ha.seldon -n ${RABBITMQ_NAMESPACE} &>/dev/null; then
+  RABBITMQ_PASSWORD=$(kubectl -n ${RABBITMQ_NAMESPACE} get secret rabbitmq-ha.seldon -o jsonpath="{.data.rabbitmq-password}" | base64 --decode 2>/dev/null || echo "")
 fi
 
-# Fallback to seldon user if default password not found
+# Fallback to default password if secret not found
 if [ -z "$RABBITMQ_PASSWORD" ]; then
-  RABBITMQ_USER="seldon"
-  if kubectl get secret rabbitmq-ha.seldon -n ${RABBITMQ_NAMESPACE} &>/dev/null; then
-    RABBITMQ_PASSWORD=$(kubectl -n ${RABBITMQ_NAMESPACE} get secret rabbitmq-ha.seldon -o jsonpath="{.data.rabbitmq-password}" | base64 --decode 2>/dev/null || echo "seldon-password")
-  else
-    RABBITMQ_PASSWORD="seldon-password"
-  fi
+  RABBITMQ_PASSWORD="seldon-password"
 fi
 
 if [ -z "$RABBITMQ_USER" ] || [ -z "$RABBITMQ_PASSWORD" ]; then
@@ -55,18 +49,39 @@ kubectl -n ${RABBITMQ_NAMESPACE} port-forward ${RABBITMQ_POD} 15672:15672 > /dev
 PORT_FORWARD_PID=$!
 sleep 2
 
-curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
+PUBLISH_RESPONSE=$(curl -s -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     -H "Content-type: application/json" \
     -H "Accept: application/json" \
-    -d '{"properties":{"content_type":"application/json"},"routing_key":"iris-model-rabbitmq-input","payload":"{\"data\": {\"ndarray\": [[1,2,3,4]] }}","payload_encoding":"string"}'
+    -d '{"properties":{"content_type":"application/json"},"routing_key":"iris-model-rabbitmq-input","payload":"{\"data\": {\"ndarray\": [[1,2,3,4]] }}","payload_encoding":"string"}')
+
+# Check if publish was successful
+if echo "$PUBLISH_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+  echo "ERROR: Failed to publish message: $PUBLISH_RESPONSE" >&2
+  kill $PORT_FORWARD_PID 2>/dev/null || true
+  exit 1
+fi
 
 function retrieveIrisResult {
-  IRIS_RESULT_PAYLOAD=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
+  RESPONSE=$(curl -s -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
       --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
       -H "Content-type: application/json" \
       -H "Accept: application/json" \
-      -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}' | jq -e -r '.[0].payload')
+      -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}')
+  
+  # Check if response is an error
+  if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+    echo "Error from RabbitMQ API: $RESPONSE" >&2
+    return 1
+  fi
+  
+  # Extract payload from response array
+  IRIS_RESULT_PAYLOAD=$(echo "$RESPONSE" | jq -e -r '.[0].payload // empty')
+  
+  # Return 1 if payload is empty (queue might be empty)
+  if [ -z "$IRIS_RESULT_PAYLOAD" ]; then
+    return 1
+  fi
 }
 with_backoff retrieveIrisResult
 

@@ -36,7 +36,7 @@ definitions:
   users:
     - username: seldon
       secret: rabbitmq-ha.seldon
-      tags: []
+      tags: [management]
   permissions:
     - user: seldon
       vhost: "/"
@@ -45,7 +45,7 @@ definitions:
       read: ".*"
   vhosts:
     - name: "/"
-    - name: "data-plane-service"
+    - name: "data-plane-service"  # Required by chart's default definitions
   queues:
     # Test queues
     - name: "iris-model-rabbitmq-input"
