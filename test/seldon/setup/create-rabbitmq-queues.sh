@@ -49,7 +49,7 @@ echo "  Note: Management API may take additional time after pod is ready..."
 # First, wait for the Management API port to be listening
 echo "  Waiting for port 15672 to be listening..."
 for i in {1..30}; do
-  if kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq -- \
+  if kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
     sh -c "nc -z localhost 15672 2>/dev/null || ss -tlnp 2>/dev/null | grep -q ':15672 ' || netstat -tlnp 2>/dev/null | grep -q ':15672 '" 2>/dev/null; then
     echo "  ✓ Port 15672 is listening"
     break
@@ -61,11 +61,11 @@ for i in {1..30}; do
 done
 
 # Then wait for the Management API to respond
-# Increase wait time - Management API can take 30-60 seconds after pod is ready
-for i in {1..60}; do
+# Management API should be ready shortly after pod is ready
+for i in {1..3}; do
   # Try to connect to management API
   # Capture both stdout and stderr, and HTTP code
-  RESPONSE=$(kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq -- \
+  RESPONSE=$(kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
     curl -s -w "\n%{http_code}" -u "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     "http://localhost:15672/api/overview" 2>&1) || RESPONSE="curl_failed"
   
@@ -79,8 +79,8 @@ for i in {1..60}; do
     HTTP_CODE="connection_failed"
   fi
   
-  if [ $i -eq 60 ]; then
-    echo "ERROR: RabbitMQ management API not ready after 30 attempts"
+  if [ $i -eq 3 ]; then
+    echo "ERROR: RabbitMQ management API not ready after 3 attempts (15 seconds)"
     echo "Last HTTP code: ${HTTP_CODE:-N/A}"
     echo "Last response: ${RESPONSE:-N/A}"
     echo ""
@@ -88,22 +88,22 @@ for i in {1..60}; do
     kubectl get pod ${RABBITMQ_POD} -n ${RABBITMQ_NAMESPACE} || true
     echo ""
     echo ">>> Checking if management port is listening..."
-    kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq -- \
+    kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
       netstat -tlnp 2>/dev/null | grep 15672 || \
-      kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq -- \
+      kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
       ss -tlnp 2>/dev/null | grep 15672 || \
       echo "Could not check port 15672"
     echo ""
     echo ">>> Testing connection without auth..."
-    kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq -- \
+    kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
       curl -s -w "\n%{http_code}" "http://localhost:15672/api/overview" 2>&1 | tail -5 || true
     exit 1
   fi
   
-  if [ $((i % 10)) -eq 0 ]; then
-    echo "  Attempt ${i}/60: HTTP ${HTTP_CODE:-connection failed}"
+  if [ $i -gt 1 ]; then
+    echo "  Attempt ${i}/3: HTTP ${HTTP_CODE:-connection failed}"
   fi
-  sleep 2
+  sleep 5
 done
 
 # Note: seldon user and permissions are created via definitions file at startup
@@ -113,7 +113,7 @@ done
 create_queue() {
   local queue_name=$1
   echo ">>> Creating queue: ${queue_name}..."
-  kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq -- \
+    kubectl -n ${RABBITMQ_NAMESPACE} exec ${RABBITMQ_POD} -c rabbitmq-ha -- \
     curl -X PUT "http://localhost:15672/api/queues/%2F/${queue_name}" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     -H "Content-type: application/json" \
