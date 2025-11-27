@@ -640,7 +640,6 @@ func TestModelWithLogRequestsForRouter(t *testing.T) {
 	g := NewGomegaWithT(t)
 	modelName := "foo"
 	routerName := "bar"
-	logged := false
 	logMessagesReceived := 0
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g.Expect(r.Header.Get(logger.CloudEventsTypeHeader)).To(Or(Equal(logger.CEInferenceRequest), Equal(logger.CEInferenceResponse)))
@@ -650,7 +649,6 @@ func TestModelWithLogRequestsForRouter(t *testing.T) {
 		g.Expect(r.Header.Get(requestIdHeaderName)).To(Equal(testSeldonPuid))
 		logMessagesReceived++
 		w.Write([]byte(""))
-		logged = true
 		fmt.Printf("%+v\n", r.Header)
 		fmt.Printf("%+v\n", r.Body)
 	})
@@ -693,6 +691,6 @@ func TestModelWithLogRequestsForRouter(t *testing.T) {
 	smRes := pResp.GetPayload().(*proto.SeldonMessage)
 	g.Expect(smRes.GetData().GetNdarray().Values[0].GetNumberValue()).Should(Equal(1.1))
 	g.Expect(smRes.GetData().GetNdarray().Values[1].GetNumberValue()).Should(Equal(2.0))
-	g.Eventually(func() bool { return logged }).Should(Equal(true))
-	g.Expect(logMessagesReceived).To(Equal(2))
+	// Wait for both request and response log messages to be received
+	g.Eventually(func() int { return logMessagesReceived }).Should(Equal(2))
 }
