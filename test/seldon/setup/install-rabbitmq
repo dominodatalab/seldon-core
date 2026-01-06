@@ -20,7 +20,7 @@ echo ">>> Installing rabbitmq cluster operator..."
 kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/download/v2.17.2/cluster-operator.yml"
 
 echo ">>> Installing rabbitmq messaging topology operator..."
-kubectl apply -f "https://github.com/rabbitmq/messaging-topology-operator/releases/download/v2.16.0/messaging-topology-operator-with-certmanager.yaml"
+kubectl apply -f "https://github.com/rabbitmq/messaging-topology-operator/releases/download/v1.6.0/messaging-topology-operator-with-certmanager.yaml"
 
 sleep 5
 
