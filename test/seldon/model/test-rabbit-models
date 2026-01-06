@@ -14,17 +14,35 @@ RABBITMQ_USER=$(kubectl -n rabbitmq get secret rabbitmq-cluster-default-user -o 
 RABBITMQ_PASSWORD=$(kubectl -n rabbitmq get secret rabbitmq-cluster-default-user -o jsonpath="{.data.password}" | base64 --decode)
 EXPECTED_IRIS_RESULT_PAYLOAD='{"data":{"names":["t:0","t:1","t:2"],"ndarray":[[0.0006985194531162835,0.00366803903943666,0.995633441507447]]},"meta":{"requestPath":{"classifier":"seldonio/sklearnserver:1.17.1"}}}'
 
+# Port-forward RabbitMQ management API to avoid needing curl in the container
+# Port-forward to the pod directly since the management API might not be exposed on the service
+echo ">>> Setting up port-forward for RabbitMQ management API..."
+kubectl -n rabbitmq port-forward rabbitmq-cluster-server-0 15672:15672 > /dev/null 2>&1 &
+PORT_FORWARD_PID=$!
+trap "kill $PORT_FORWARD_PID 2>/dev/null || true" EXIT
+# Wait for port-forward to be ready
+sleep 5
+# Verify port-forward is working
+for i in {1..10}; do
+  if curl -s -f --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" http://localhost:15672/api/overview > /dev/null 2>&1; then
+    break
+  fi
+  if [ $i -eq 10 ]; then
+    echo "ERROR: Failed to establish port-forward to RabbitMQ management API"
+    exit 1
+  fi
+  sleep 1
+done
+
 echo ">>> Sending predict message to iris rabbitmq model input queue..."
-kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-    curl -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
+curl -X POST "http://localhost:15672/api/exchanges/%2F/amq.default/publish" \
     --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
     -H "Content-type: application/json" \
     -H "Accept: application/json" \
     -d '{"properties":{"content_type":"application/json"},"routing_key":"iris-model-rabbitmq-input","payload":"{\"data\": {\"ndarray\": [[1,2,3,4]] }}","payload_encoding":"string"}'
 
 function retrieveIrisResult {
-  IRIS_RESULT_PAYLOAD=$(kubectl -n rabbitmq exec rabbitmq-cluster-server-0 -c rabbitmq -- \
-      curl -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
+  IRIS_RESULT_PAYLOAD=$(curl -X POST "http://localhost:15672/api/queues/%2F/iris-model-rabbitmq-output/get" \
       --user "${RABBITMQ_USER}:${RABBITMQ_PASSWORD}" \
       -H "Content-type: application/json" \
       -H "Accept: application/json" \
