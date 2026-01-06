@@ -10,7 +10,10 @@ kubectl delete -f "${SCRIPT_DIR}/manifests/rabbitmq/seldon-rabbitmq-user.yaml" -
 echo ">>> Deleting rabbitmq cluster..."
 kubectl delete -f "${SCRIPT_DIR}/manifests/rabbitmq/rabbitmq-cluster.yaml" --ignore-not-found=true || true
 
-echo ">>> Uninstalling rabbitmq operator..."
+echo ">>> Uninstalling rabbitmq messaging topology operator..."
+kubectl delete -f "https://github.com/rabbitmq/messaging-topology-operator/releases/download/v2.16.0/messaging-topology-operator-with-certmanager.yaml" --ignore-not-found=true || true
+
+echo ">>> Uninstalling rabbitmq cluster operator..."
 kubectl delete -f "https://github.com/rabbitmq/cluster-operator/releases/download/v2.17.2/cluster-operator.yml" --ignore-not-found=true || true
 
 echo ">>> Deleting namespaces..."

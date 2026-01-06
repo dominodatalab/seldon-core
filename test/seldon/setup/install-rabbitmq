@@ -10,13 +10,21 @@ echo ">>> Creating namespaces..."
 kubectl create namespace rabbitmq-system
 kubectl create namespace rabbitmq
 
+echo ">>> Installing cert-manager (required for Messaging Topology Operator)..."
+kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace cert-manager cert-manager.io/disable-validation=true --overwrite=true || true
+kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
+kubectl wait --for=condition=Available deployments --all --timeout 120s -n cert-manager || true
 
-echo ">>> Installing rabbitmq operator..."
+echo ">>> Installing rabbitmq cluster operator..."
 kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/download/v2.17.2/cluster-operator.yml"
+
+echo ">>> Installing rabbitmq messaging topology operator..."
+kubectl apply -f "https://github.com/rabbitmq/messaging-topology-operator/releases/download/v2.16.0/messaging-topology-operator-with-certmanager.yaml"
 
 sleep 5
 
-echo ">>> wait for rabbitmq operator"
+echo ">>> wait for rabbitmq operators"
 kubectl wait --for=condition=Available deployments --all --timeout 120s -n rabbitmq-system
 
 echo ">>> Creating rabbitmq cluster..."
