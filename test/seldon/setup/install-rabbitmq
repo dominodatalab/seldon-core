@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Source: https://www.rabbitmq.com/kubernetes/operator/install-operator.html#helm-chart
+# Source: https://www.rabbitmq.com/kubernetes/operator/install-operator.html
 
 set -o nounset -o errexit -o pipefail
 
@@ -12,8 +12,7 @@ kubectl create namespace rabbitmq
 
 
 echo ">>> Installing rabbitmq operator..."
-helm upgrade --install rabbitmq-cluster oci://registry-1.docker.io/bitnamicharts/rabbitmq-cluster-operator \
-    --namespace rabbitmq-system
+kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/download/v2.17.2/cluster-operator.yml"
 
 sleep 5
 

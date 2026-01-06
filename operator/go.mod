@@ -1,8 +1,8 @@
 module github.com/seldonio/seldon-core/operator
 
-go 1.23.0
+go 1.25
 
-toolchain go1.24.2
+toolchain go1.25
 
 require (
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
