@@ -1,6 +1,6 @@
 # Build the manager binary
-# 1.25.3-bookworm image points to go 1.25.3
-FROM golang:1.25.3-bookworm as builder
+# 1.24.9-bookworm image points to go 1.24.9
+FROM golang:1.24.9-bookworm as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
