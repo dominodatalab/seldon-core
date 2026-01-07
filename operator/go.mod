@@ -82,6 +82,10 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.54.0
+replace (
+	// Resolves https://access.redhat.com/security/cve/CVE-2025-68156
+	github.com/expr-lang/expr v1.17.2 => github.com/expr-lang/expr v1.17.7
+	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.54.0
+)
 
 exclude github.com/go-logr/logr v1.0.0

@@ -96,6 +96,8 @@ require (
 
 replace (
 	github.com/codahale/hdrhistogram => github.com/HdrHistogram/hdrhistogram-go v1.1.2
+	// Resolves https://access.redhat.com/security/cve/CVE-2025-68156
+	github.com/expr-lang/expr v1.17.2 => github.com/expr-lang/expr v1.17.7
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.54.0
 	github.com/seldonio/seldon-core/operator => ./_operator
 	github.com/tensorflow/tensorflow/tensorflow/go/core => ./proto/tensorflow/core
