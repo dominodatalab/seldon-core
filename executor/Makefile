@@ -11,8 +11,6 @@ EXECUTOR_FOLDERS ?= ./api/... ./predictor/... ./k8s/... ./logger/...
 
 KIND_NAME ?= kind
 
-# Enable automatic toolchain download to match go.mod toolchain version
-export GOTOOLCHAIN=auto
 
 # For labeling the operator Docker image(s)
 GITHUB_TEAM := "dominodatalab/seldon-core-maintainers"

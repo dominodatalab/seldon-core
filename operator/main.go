@@ -22,6 +22,10 @@ import (
 	"os"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/seldonio/seldon-core/operator/constants"
@@ -205,18 +209,25 @@ func main() {
 		"renew deadline", leaderElectionRenewDeadlineSecs,
 		"retry period", leaderElectionRetryPeriodSecs)
 
-	mgr, err := ctrl.NewManager(config, ctrl.Options{
+	options := ctrl.Options{
 		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
+		Metrics:                    server.Options{BindAddress: metricsAddr},
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionID:           leaderElectionID,
 		LeaderElectionResourceLock: leaderElectionResourceLock,
 		LeaseDuration:              leaderElectionLeaseDuration,
 		RenewDeadline:              leaderElectionRenewDeadlineDuration,
 		RetryPeriod:                leaderElectionRetryPeriodDuration,
-		Port:                       webHookPort,
-		Namespace:                  namespace,
-	})
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: webHookPort}),
+	}
+	// If the restricted namespace flag or watch env var is set, then restrict the cache to that namespace
+	if namespace != "" {
+		options.Cache = cache.Options{
+			DefaultNamespaces: map[string]cache.Config{namespace: {}},
+		}
+	}
+
+	mgr, err := ctrl.NewManager(config, options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
