@@ -82,4 +82,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.54.0
+
 exclude github.com/go-logr/logr v1.0.0

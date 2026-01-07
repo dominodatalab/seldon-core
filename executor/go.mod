@@ -94,10 +94,11 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/tensorflow/tensorflow/tensorflow/go/core => ./proto/tensorflow/core
-
-replace github.com/seldonio/seldon-core/operator => ./_operator
-
-replace github.com/codahale/hdrhistogram => github.com/HdrHistogram/hdrhistogram-go v1.1.2
+replace (
+	github.com/codahale/hdrhistogram => github.com/HdrHistogram/hdrhistogram-go v1.1.2
+	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.54.0
+	github.com/seldonio/seldon-core/operator => ./_operator
+	github.com/tensorflow/tensorflow/tensorflow/go/core => ./proto/tensorflow/core
+)
 
 exclude github.com/go-logr/logr v1.0.0
