@@ -2,12 +2,13 @@ package predictor
 
 import (
 	"fmt"
-	"github.com/seldonio/seldon-core/executor/api"
-	"github.com/seldonio/seldon-core/operator/apis/machinelearning.seldon.io/v1"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/seldonio/seldon-core/executor/api"
+	v1 "github.com/seldonio/seldon-core/operator/apis/machinelearning.seldon.io/v1"
 )
 
 func Ready(protocol string, node *v1.PredictiveUnit, fullHealthCheck bool) error {
@@ -34,7 +35,8 @@ func ReadyTCP(node *v1.PredictiveUnit) error {
 		}
 	}
 	if node.Endpoint != nil && node.Endpoint.ServiceHost != "" && node.Endpoint.ServicePort > 0 {
-		c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", node.Endpoint.ServiceHost, node.Endpoint.ServicePort))
+		address := net.JoinHostPort(node.Endpoint.ServiceHost, strconv.Itoa(int(node.Endpoint.ServicePort)))
+		c, err := net.Dial("tcp", address)
 		if err != nil {
 			return err
 		} else {

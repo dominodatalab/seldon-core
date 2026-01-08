@@ -11,6 +11,7 @@ EXECUTOR_FOLDERS ?= ./api/... ./predictor/... ./k8s/... ./logger/...
 
 KIND_NAME ?= kind
 
+
 # For labeling the operator Docker image(s)
 GITHUB_TEAM := "dominodatalab/seldon-core-maintainers"
 BUILD_DATE := $(shell date -uIseconds)
