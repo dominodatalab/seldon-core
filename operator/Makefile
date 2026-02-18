@@ -47,7 +47,7 @@ lint: licenses/dep.txt
 		./licenses
 
 # Run tests
-test: install-ginkgo generate fmt vet manifests_all generate-resources envtest
+test: install-etcd install-ginkgo generate fmt vet manifests_all generate-resources envtest
 	ACK_GINKGO_RC=true \
 	ACK_GINKGO_DEPRECATIONS=1.16.5 \
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -r -outputdir=. -cover -coverprofile=cover.out ./controllers ./utils ./apis
@@ -228,6 +228,15 @@ GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
+
+.PHONY: install-etcd
+install-etcd:
+ifeq (, $(shell command -v etcd))
+	ETCD_VERSION=v3.6.0
+	wget https://github.com{ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz
+	tar -xvf etcd-${ETCD_VERSION}-linux-amd64.tar.gz
+	sudo mv etcd-${ETCD_VERSION}-linux-amd64/etcd etcd-${ETCD_VERSION}-linux-amd64/etcdctl /usr/local/bin/
+endif
 
 .PHONY: install-ginkgo
 install-ginkgo:
