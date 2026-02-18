@@ -233,7 +233,7 @@ endef
 install-etcd:
 ifeq (, $(shell command -v etcd))
 	ETCD_VERSION=v3.6.0
-	wget https://github.com{ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz
+	wget "https://github.com${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz"
 	tar -xvf etcd-${ETCD_VERSION}-linux-amd64.tar.gz
 	sudo mv etcd-${ETCD_VERSION}-linux-amd64/etcd etcd-${ETCD_VERSION}-linux-amd64/etcdctl /usr/local/bin/
 endif
