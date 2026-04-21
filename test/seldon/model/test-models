@@ -17,7 +17,7 @@ IRIS_RESULT_PAYLOAD=$(with_backoff kubectl -n $COMPUTE_NAMESPACE exec deployment
     curl -X POST http://localhost:8000/api/v1.0/predictions \
     -H 'Content-Type: application/json' -d '{"data": {"ndarray": [[1,2,3,4]] }}')
 if [ "${EXPECTED_IRIS_RESULT_PAYLOAD}" != "${IRIS_RESULT_PAYLOAD}" ]; then
-  echo "UNEXPECTED IRIS MODEL RESULT: ${IRIS_RESULT_PAYLOAD}"
+  echo "UNEXPECTED IRIS MODEL RESULT: '${IRIS_RESULT_PAYLOAD}'"
   exit 1
 fi
 
