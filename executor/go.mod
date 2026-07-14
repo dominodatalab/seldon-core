@@ -1,6 +1,6 @@
 module github.com/seldonio/seldon-core/executor
 
-go 1.25.11
+go 1.25.12
 
 require (
 	github.com/cloudevents/sdk-go v1.2.0
