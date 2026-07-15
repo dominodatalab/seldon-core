@@ -20,6 +20,7 @@ IMAGE_BASE_DOCKERFILE := "https://github.com/dominodatalab/seldon-core/blob/rabb
 # These should be set in CI, but in case we are running locally, let's set some default values
 CIRCLE_SHA1 ?= $(shell git rev-parse HEAD)
 CIRCLE_BUILD_URL ?= "local"
+CIRCLE_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -111,7 +112,8 @@ docker-build: test copy_openapi_resources
 		--label "org.opencontainers.image.revision=${CIRCLE_SHA1}" \
 		--label "com.dominodatalab.image.osrp.datetime=${BUILD_DATE}" \
 		--label "com.dominodatalab.image.dockerfile=${IMAGE_BASE_DOCKERFILE}" \
-		--label "com.dominodatalab.ci.build-url=${CIRCLE_BUILD_URL}"
+		--label "com.dominodatalab.ci.build-url=${CIRCLE_BUILD_URL}" \
+		--label "com.dominodatalab.image.git-branch=${CIRCLE_BRANCH}"
 
 # Build the docker image for Redhat
 docker-build-redhat: test copy_openapi_resources
