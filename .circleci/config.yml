@@ -91,13 +91,13 @@ workflows:
     jobs:
       - build-and-push:
           context:
-            - org-global
+            - seldon-core-quay
           filters:
             tags:
               only: /\d+(\.\d+)*(-.*)*-rabbitmq(-.*)*/
       - test:
           context:
-            - org-global
+            - seldon-core-quay
           requires:
             - build-and-push
           filters:
