@@ -1,6 +1,6 @@
 module github.com/seldonio/seldon-core/executor
 
-go 1.25.12
+go 1.25.13
 
 require (
 	github.com/cloudevents/sdk-go v1.2.0
@@ -16,7 +16,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.21.1
 	github.com/prometheus/common v0.63.0
-	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/rabbitmq/amqp091-go v1.13.0
 	github.com/seldonio/seldon-core/operator v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.10.0
 	github.com/tensorflow/tensorflow/tensorflow/go/core v0.0.0-00010101000000-000000000000
