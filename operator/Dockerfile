@@ -1,6 +1,6 @@
 # Build the manager binary
-# 1.26.9-trixie image points to go 1.26.9
-FROM golang:1.26.9-trixie as builder
+# 1.26.10-trixie image points to go 1.26.10
+FROM golang:1.26.10-trixie as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
