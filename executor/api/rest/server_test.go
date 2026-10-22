@@ -12,6 +12,7 @@ import (
 	guuid "github.com/google/uuid"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/common/expfmt"
+	promcommonmodel "github.com/prometheus/common/model"
 	"github.com/seldonio/seldon-core/executor/api"
 	"github.com/seldonio/seldon-core/executor/api/metric"
 	"github.com/seldonio/seldon-core/executor/api/payload"
@@ -337,7 +338,7 @@ func TestServerMetrics(t *testing.T) {
 	res = httptest.NewRecorder()
 	r.Router.ServeHTTP(res, req)
 	g.Expect(res.Code).To(Equal(200))
-	tp := expfmt.TextParser{}
+	tp := expfmt.NewTextParser(promcommonmodel.UTF8Validation)
 	metrics, err := tp.TextToMetricFamilies(res.Body)
 	g.Expect(err).Should(BeNil())
 	g.Expect(metrics[metric.ServerRequestsMetricName]).ShouldNot(BeNil())

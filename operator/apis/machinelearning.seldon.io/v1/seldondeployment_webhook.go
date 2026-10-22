@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -24,13 +25,11 @@ import (
 	"github.com/seldonio/seldon-core/operator/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -54,8 +53,10 @@ func GetEnv(key, fallback string) string {
 
 func (r *SeldonDeployment) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	C = mgr.GetClient()
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+	h := &seldonDeploymentWebhook{}
+	return ctrl.NewWebhookManagedBy(mgr, &SeldonDeployment{}).
+		WithDefaulter(h).
+		WithValidator(h).
 		Complete()
 }
 
@@ -328,22 +329,32 @@ func (r *SeldonDeploymentSpec) ValidateSeldonDeployment() error {
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // +kubebuilder:webhook:webhookVersions=v1,verbs=create;update,path=/validate-machinelearning-seldon-io-v1-seldondeployment,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=machinelearning.seldon.io,resources=seldondeployments,versions=v1,name=v1.vseldondeployment.kb.io
 
-var _ webhook.Validator = &SeldonDeployment{}
+// seldonDeploymentWebhook serves the defaulting and validating webhooks for SeldonDeployment.
+type seldonDeploymentWebhook struct{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *SeldonDeployment) ValidateCreate() (admission.Warnings, error) {
+var _ admission.Validator[*SeldonDeployment] = &seldonDeploymentWebhook{}
+var _ admission.Defaulter[*SeldonDeployment] = &seldonDeploymentWebhook{}
+
+// Default implements admission.Defaulter so a defaulting webhook will be registered for the type
+func (w *seldonDeploymentWebhook) Default(ctx context.Context, r *SeldonDeployment) error {
+	r.Default()
+	return nil
+}
+
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type
+func (w *seldonDeploymentWebhook) ValidateCreate(ctx context.Context, r *SeldonDeployment) (admission.Warnings, error) {
 	seldondeploymentLog.Info("Validating v1 Webhook called for CREATE", "name", r.Name)
 	return nil, r.Spec.ValidateSeldonDeployment()
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *SeldonDeployment) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type
+func (w *seldonDeploymentWebhook) ValidateUpdate(ctx context.Context, oldObj, r *SeldonDeployment) (admission.Warnings, error) {
 	seldondeploymentLog.Info("Validating v1 webhook called for UPDATE", "name", r.Name)
 	return nil, r.Spec.ValidateSeldonDeployment()
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *SeldonDeployment) ValidateDelete() (admission.Warnings, error) {
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type
+func (w *seldonDeploymentWebhook) ValidateDelete(ctx context.Context, r *SeldonDeployment) (admission.Warnings, error) {
 	seldondeploymentLog.Info("Validating v1 webhook called for DELETE", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
