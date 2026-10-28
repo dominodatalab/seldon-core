@@ -13,7 +13,6 @@ cloud.google.com/go/storage
 code.cloudfoundry.org/clock
 contrib.go.opencensus.io/exporter/ocagent
 contrib.go.opencensus.io/exporter/prometheus
-contrib.go.opencensus.io/exporter/zipkin
 dario.cat/mergo
 dmitri.shuralyov.com/gpu/mtl
 emperror.dev/errors
@@ -330,9 +329,9 @@ github.com/prashantv/gostub
 github.com/prometheus/client_golang
 github.com/prometheus/client_model
 github.com/prometheus/common
+github.com/prometheus/otlptranslator
 github.com/prometheus/procfs
 github.com/prometheus/prometheus
-github.com/prometheus/statsd_exporter
 github.com/rabbitmq/amqp091-go
 github.com/rcrowley/go-metrics
 github.com/redis/go-redis/v9
@@ -401,11 +400,15 @@ go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/contrib/detectors/gcp
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
+go.opentelemetry.io/contrib/instrumentation/runtime
 go.opentelemetry.io/otel
 go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc
 go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
 go.opentelemetry.io/otel/exporters/otlp/otlptrace
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+go.opentelemetry.io/otel/exporters/prometheus
+go.opentelemetry.io/otel/exporters/stdout/stdouttrace
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/sdk
 go.opentelemetry.io/otel/sdk/metric
@@ -496,6 +499,5 @@ sigs.k8s.io/kustomize/cmd/config
 sigs.k8s.io/kustomize/kustomize/v5
 sigs.k8s.io/kustomize/kyaml
 sigs.k8s.io/randfill
-sigs.k8s.io/structured-merge-diff/v4
 sigs.k8s.io/structured-merge-diff/v6
 sigs.k8s.io/yaml
