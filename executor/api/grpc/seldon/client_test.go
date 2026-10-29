@@ -12,6 +12,8 @@ import (
 	"github.com/seldonio/seldon-core/executor/api/payload"
 	"github.com/seldonio/seldon-core/executor/k8s"
 	v1 "github.com/seldonio/seldon-core/operator/apis/machinelearning.seldon.io/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
@@ -100,7 +102,7 @@ func TestClientPredictTimeout(t *testing.T) {
 	req := createPredictPayload(g)
 	_, err := client.Predict(context.TODO(), "m", host, port, req, nil)
 	g.Expect(err).NotTo(BeNil())
-	g.Expect(err.Error()).To(Equal("rpc error: code = DeadlineExceeded desc = context deadline exceeded"))
+	g.Expect(status.Code(err)).To(Equal(codes.DeadlineExceeded))
 }
 
 func TestClientPredictMessageSize(t *testing.T) {
