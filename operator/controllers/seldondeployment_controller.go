@@ -2052,21 +2052,21 @@ func (r *SeldonDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	components, err := r.createComponents(ctx, instance, podSecurityContext, log)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 		r.updateStatusForError(instance, err, log)
 		return ctrl.Result{}, err
 	}
 
 	servicesReady, err := r.createServices(components, instance, false, log)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 		r.updateStatusForError(instance, err, log)
 		return ctrl.Result{}, err
 	}
 
 	hpasReady, err := r.createHpas(components, instance, log)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 		r.updateStatusForError(instance, err, log)
 		return ctrl.Result{}, err
 	}
@@ -2076,7 +2076,7 @@ func (r *SeldonDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if withKedaSupport {
 		kedaScaledObjectsReady, err = r.createKedaScaledObjects(components, instance, log)
 		if err != nil {
-			r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 			r.updateStatusForError(instance, err, log)
 			return ctrl.Result{}, err
 		}
@@ -2086,21 +2086,21 @@ func (r *SeldonDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	pdbsReady, err := r.createPdbs(components, instance, log)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 		r.updateStatusForError(instance, err, log)
 		return ctrl.Result{}, err
 	}
 
 	deploymentsReady, deploymentsProgressing, err := r.createDeployments(components, instance, log)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 		r.updateStatusForError(instance, err, log)
 		return ctrl.Result{}, err
 	}
 	if deploymentsReady {
 		err := r.completeServiceCreation(instance, components, log)
 		if err != nil {
-			r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, err.Error())
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, constants.EventsInternalError, "%s", err.Error())
 			r.updateStatusForError(instance, err, log)
 			return ctrl.Result{}, err
 		}
