@@ -45,9 +45,7 @@ RUN wget -O mitchellh-cli.tar.gz https://github.com/mitchellh/cli/archive/master
 RUN wget -O mitchellh-gox.tar.gz https://github.com/mitchellh/gox/archive/master.tar.gz
 RUN wget -O mozilla-tls-observatory.tar.gz https://github.com/mozilla/tls-observatory/archive/master.tar.gz
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/base-debian13:nonroot
+FROM cgr.dev/dominodatalab.com/chainguard-base:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY licenses/license.txt licenses/license.txt
@@ -56,4 +54,5 @@ COPY generated/admissionregistration.k8s.io_v1_validatingwebhookconfiguration_se
 COPY generated/v1_service_seldon-webhook-service.yaml /tmp/operator-resources/service.yaml
 COPY generated/v1_configmap_seldon-config.yaml /tmp/operator-resources/configmap.yaml
 COPY generated/apiextensions.k8s.io_v1_customresourcedefinition_seldondeployments.machinelearning.seldon.io.yaml /tmp/operator-resources/crd-v1.yaml
+USER 65532
 ENTRYPOINT ["/manager"]
